@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Christmas Athletic 3D - 1000 Stages Winter Adventure</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #0b1420;
+      color: #ffffff;
+    }
+    #game-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+
+    /* Top HUD */
+    #hud {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      right: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      z-index: 10;
+      pointer-events: none;
+    }
+    .hud-card {
+      background: rgba(14, 25, 45, 0.75);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 14px;
+      padding: 12px 20px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.37);
+      pointer-events: auto;
+    }
+    #hud-stage-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #ffd700;
+      text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+      margin-bottom: 4px;
+    }
+    #hud-gimmick {
+      font-size: 13px;
+      color: #aae0ff;
+      letter-spacing: 0.5px;
+    }
+
+    .hud-stats {
+      display: flex;
+      gap: 16px;
+    }
+    .stat-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 16px;
+      font-weight: bold;
+      background: rgba(255, 255, 255, 0.1);
+      padding: 6px 14px;
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+    .stat-badge span.icon {
+      font-size: 18px;
+    }
+
+    /* Controls Bar at bottom */
+    #controls-bar {
+      position: absolute;
+      bottom: 16px;
+      left: 16px;
+      right: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      z-index: 10;
+      pointer-events: none;
+    }
+    .controls-guide {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.85);
+      background: rgba(14, 25, 45, 0.7);
+      backdrop-filter: blur(8px);
+      padding: 8px 16px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      line-height: 1.6;
+    }
+    .key-badge {
+      display: inline-block;
+      background: #2a3e5c;
+      border: 1px solid #6688aa;
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-weight: bold;
+      font-size: 11px;
+      margin: 0 2px;
+    }
+
+    /* Quick Buttons */
+    .button-group {
+      display: flex;
+      gap: 10px;
+      pointer-events: auto;
+    }
+    button.game-btn {
+      background: linear-gradient(135deg, #c0392b, #962d22);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      color: #fff;
+      font-weight: bold;
+      font-size: 13px;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+      transition: all 0.15s ease;
+    }
+    button.game-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 18px rgba(255, 215, 0, 0.35);
+      background: linear-gradient(135deg, #e74c3c, #c0392b);
+    }
+    button.game-btn.secondary {
+      background: linear-gradient(135deg, #1f4068, #162447);
+    }
+    button.game-btn.secondary:hover {
+      background: linear-gradient(135deg, #28558a, #1f4068);
+    }
+
+    /* Modals (Clear & Stage Select) */
+    .modal-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(5, 10, 20, 0.78);
+      backdrop-filter: blur(12px);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+      transition: opacity 0.25s ease;
+    }
+    .modal-overlay.hidden {
+      display: none;
+    }
+    .modal-card {
+      background: linear-gradient(145deg, #162238, #0e1624);
+      border: 2px solid #ffd700;
+      border-radius: 20px;
+      padding: 32px 40px;
+      text-align: center;
+      box-shadow: 0 12px 48px rgba(255, 215, 0, 0.25), 0 0 80px rgba(0, 0, 0, 0.8);
+      max-width: 520px;
+      width: 90%;
+    }
+    .modal-title {
+      font-size: 28px;
+      font-weight: 800;
+      color: #ffd700;
+      margin-bottom: 8px;
+      text-shadow: 0 0 15px rgba(255, 215, 0, 0.6);
+    }
+    .modal-sub {
+      color: #ccddee;
+      font-size: 14px;
+      margin-bottom: 24px;
+    }
+    .stat-row {
+      display: flex;
+      justify-content: space-around;
+      margin: 20px 0;
+      background: rgba(255, 255, 255, 0.05);
+      padding: 14px;
+      border-radius: 12px;
+    }
+    .stat-item .val {
+      font-size: 24px;
+      font-weight: bold;
+      color: #fff;
+    }
+    .stat-item .lbl {
+      font-size: 12px;
+      color: #88aacc;
+      margin-top: 4px;
+    }
+
+    /* Stage Grid in Select Modal */
+    #stage-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin: 18px 0;
+      max-height: 220px;
+      overflow-y: auto;
+      padding: 8px;
+    }
+    .stage-btn {
+      background: #1b2d48;
+      border: 1px solid #3d5e8c;
+      color: #e0f0ff;
+      padding: 10px 6px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .stage-btn:hover {
+      background: #ffd700;
+      color: #0b1420;
+      border-color: #ffe066;
+      transform: scale(1.05);
+    }
+    .stage-btn.active {
+      border: 2px solid #ff4444;
+      background: #801818;
+    }
+    .stage-input-box {
+      margin-top: 16px;
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+    .stage-input-box input {
+      width: 120px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid #5577aa;
+      background: #0f1c30;
+      color: #fff;
+      font-size: 15px;
+      text-align: center;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container"></div>
+
+  <!-- Top HUD -->
+  <div id="hud">
+    <div class="hud-card">
+      <div id="hud-stage-title">Stage 1: Frosty Pine Forest</div>
+      <div id="hud-gimmick">Icy Slippery Platforms • Super Jump Presents</div>
+    </div>
+    <div class="hud-stats">
+      <div class="stat-badge">
+        <span class="icon">🔔</span>
+        <span id="hud-bells">0 / 0</span>
+      </div>
+      <div class="stat-badge">
+        <span class="icon">⏱️</span>
+        <span id="hud-timer">0.0s</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Controls & Action Bar -->
+  <div id="controls-bar">
+    <div class="controls-guide">
+      <span class="key-badge">W</span><span class="key-badge">A</span><span class="key-badge">S</span><span class="key-badge">D</span> / <span class="key-badge">↑←↓→</span> 移動 
+      | <span class="key-badge">SPACE</span> ジャンプ 
+      | <span class="key-badge">マウスドラッグ</span> 視点回転 
+      | <span class="key-badge">R</span> リトライ 
+      | <span class="key-badge">ESC</span> ステージ選択
+    </div>
+    <div class="button-group">
+      <button class="game-btn secondary" id="btn-track">🎷 Upbeat Band</button>
+      <button class="game-btn secondary" id="btn-mute">🎵 BGM ON</button>
+      <button class="game-btn secondary" id="btn-select-stage">🗺️ ステージ選択 (1-1000)</button>
+      <button class="game-btn" id="btn-retry">🔄 やり直し</button>
+    </div>
+  </div>
+
+  <!-- Stage Clear Modal -->
+  <div id="clear-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-title">⭐ STAGE CLEAR! ⭐</div>
+      <div class="modal-sub">リアルクリスマスツリーの頂点に到達しました！</div>
+      <div class="stat-row">
+        <div class="stat-item">
+          <div class="val" id="clear-stage-num">1</div>
+          <div class="lbl">STAGE</div>
+        </div>
+        <div class="stat-item">
+          <div class="val" id="clear-time">0.0s</div>
+          <div class="lbl">TIME</div>
+        </div>
+        <div class="stat-item">
+          <div class="val" id="clear-bells">0 / 0</div>
+          <div class="lbl">BELLS</div>
+        </div>
+      </div>
+      <div style="display: flex; gap: 12px; justify-content: center; margin-top: 20px;">
+        <button class="game-btn" id="btn-next-stage" style="font-size: 16px; padding: 12px 24px;">🎁 次のステージへ</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stage Select Modal (1 to 1000) -->
+  <div id="stage-select-modal" class="modal-overlay hidden">
+    <div class="modal-card" style="max-width: 580px;">
+      <div class="modal-title">🗺️ ステージ選択 (全1000ステージ)</div>
+      <div class="modal-sub">好きなステージ番号を入力してジャンプするか、主要ステージを選んでください</div>
+      
+      <div id="stage-grid"></div>
+
+      <div class="stage-input-box">
+        <input type="number" id="input-stage-num" min="1" max="1000" placeholder="1〜1000" value="1">
+        <button class="game-btn" id="btn-jump-stage">🚀 このステージへ</button>
+      </div>
+      <div style="margin-top: 18px;">
+        <button class="game-btn secondary" id="btn-close-select">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="libs/three.min.js"></script>
+  <script src="src/sound.js"></script>
+  <script src="src/tree.js"></script>
+  <script src="src/gimmicks.js"></script>
+  <script src="src/stage-generator.js"></script>
+  <script src="src/player.js"></script>
+  <script src="src/game.js"></script>
+</body>
+</html>

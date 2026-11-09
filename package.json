@@ -1,0 +1,41 @@
+{
+  "name": "christmas-athletic-3d",
+  "productName": "Christmas Athletic 3D",
+  "version": "1.0.0",
+  "description": "Christmas-themed 3D Platformer Athletic Game with 1000+ Stages, Realistic Christmas Trees, and Instrumental Jingle Bells BGM",
+  "main": "main.js",
+  "author": "youyouboydragonOfficial",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "build:win": "electron-builder --win --x64"
+  },
+  "build": {
+    "appId": "com.youyouboydragon.christmasathletic3d",
+    "productName": "Christmas Athletic 3D",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable",
+        "zip"
+      ],
+      "icon": "assets/icons/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  },
+  "dependencies": {
+    "three": "^0.160.0"
+  },
+  "devDependencies": {
+    "electron": "^28.2.0",
+    "electron-builder": "^24.9.1"
+  }
+}
