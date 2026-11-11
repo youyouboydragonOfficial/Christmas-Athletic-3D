@@ -495,21 +495,21 @@ class Game {
       }
     });
 
-    // 4. Spinning Candy Hazards
+    // 4. Map-Specific Christmas Traps (8 Unique Trap Types!)
     this.stageData.hazardObjects.forEach(haz => {
-      haz.rotation.y += haz.userData.speed * delta;
-      const d = this.player.position.distanceTo(haz.position);
-      if (d < haz.userData.length * 0.45 && Math.abs(this.player.position.y - haz.position.y) < 1.2) {
-        if (this.player.invincibleTimer <= 0 && !this.player.isDead) {
-          this.player.hp = Math.max(0, this.player.hp - 35);
-          this.player.velocity.y = 8.5;
-          this.player.invincibleTimer = 1.0;
-          if (this.player.hp <= 0) {
-            this.player.triggerInstantDeath(() => this.triggerDeathFlash());
-          } else if (window.soundManager) {
-            window.soundManager.playFall();
+      if (haz.userData && haz.userData.update) {
+        haz.userData.update(delta, time, this.player.position, () => {
+          if (this.player.invincibleTimer <= 0 && !this.player.isDead) {
+            this.player.hp = Math.max(0, this.player.hp - 34);
+            this.player.velocity.y = 8.2;
+            this.player.invincibleTimer = 1.1;
+            if (this.player.hp <= 0) {
+              this.player.triggerInstantDeath(() => this.triggerDeathFlash());
+            } else if (window.soundManager) {
+              window.soundManager.playFall();
+            }
           }
-        }
+        });
       }
     });
 
@@ -543,41 +543,48 @@ class Game {
       this.stageData.goalSanta.userData.rightArm.rotation.z = -0.55 + Math.sin(time * 5.5) * 0.4;
     }
 
-    // 7. Update Flying Santa Sleighs & Aurora Sky!
+    // 7. Update Flying Santa Sleighs & Aurora Sky (Directly in Forward Camera View!)
     if (this.stageData.envData) {
       const env = this.stageData.envData;
       if (env.skyWonderland && env.skyWonderland.userData.update) {
         env.skyWonderland.userData.update(delta, time);
+        if (env.skyWonderland.userData.moonGroup) {
+          env.skyWonderland.userData.moonGroup.position.set(
+            this.player.position.x - 16,
+            this.player.position.y + 24,
+            this.player.position.z + 115
+          );
+        }
       }
 
-      // Sleigh 1: Soaring across the Full Moon & Aurora sky in a wide figure-8
+      // Sleigh 1: Swooping across the player's forward sky view (Left <-> Right figure-8)
       if (env.santaSleighHigh) {
         const s1 = env.santaSleighHigh;
-        const t1 = time * 0.32;
-        const nextT1 = t1 + 0.05;
-        const x1 = Math.sin(t1) * 48;
-        const y1 = 26 + Math.sin(t1 * 2) * 5;
-        const z1 = this.player.position.z + 42 + Math.cos(t1) * 28;
-        const nx1 = Math.sin(nextT1) * 48;
-        const ny1 = 26 + Math.sin(nextT1 * 2) * 5;
-        const nz1 = this.player.position.z + 42 + Math.cos(nextT1) * 28;
+        const t1 = time * 0.52;
+        const nextT1 = t1 + 0.04;
+        const x1 = this.player.position.x + Math.sin(t1) * 24;
+        const y1 = this.player.position.y + 8.5 + Math.sin(t1 * 2) * 2.2;
+        const z1 = this.player.position.z + 32 + Math.cos(t1) * 10;
+        const nx1 = this.player.position.x + Math.sin(nextT1) * 24;
+        const ny1 = this.player.position.y + 8.5 + Math.sin(nextT1 * 2) * 2.2;
+        const nz1 = this.player.position.z + 32 + Math.cos(nextT1) * 10;
 
         s1.position.set(x1, y1, z1);
         s1.lookAt(nx1, ny1, nz1);
         if (s1.userData.update) s1.userData.update(delta, time);
       }
 
-      // Sleigh 2: Flying along the course ahead of the player
+      // Sleigh 2: Counter-orbiting in front of the Full Moon & Course ahead
       if (env.santaSleighMid) {
         const s2 = env.santaSleighMid;
-        const t2 = time * 0.45 + 2.2;
-        const nextT2 = t2 + 0.05;
-        const x2 = Math.cos(t2) * 35;
-        const y2 = 18 + Math.sin(t2 * 1.5) * 4;
-        const z2 = this.player.position.z + 28 + Math.sin(t2) * 22;
-        const nx2 = Math.cos(nextT2) * 35;
-        const ny2 = 18 + Math.sin(nextT2 * 1.5) * 4;
-        const nz2 = this.player.position.z + 28 + Math.sin(nextT2) * 22;
+        const t2 = time * 0.62 + 2.6;
+        const nextT2 = t2 + 0.04;
+        const x2 = this.player.position.x + Math.cos(t2) * 20;
+        const y2 = this.player.position.y + 6.5 + Math.sin(t2 * 1.5) * 1.8;
+        const z2 = this.player.position.z + 24 + Math.sin(t2) * 9;
+        const nx2 = this.player.position.x + Math.cos(nextT2) * 20;
+        const ny2 = this.player.position.y + 6.5 + Math.sin(nextT2 * 1.5) * 1.8;
+        const nz2 = this.player.position.z + 24 + Math.sin(nextT2) * 9;
 
         s2.position.set(x2, y2, z2);
         s2.lookAt(nx2, ny2, nz2);

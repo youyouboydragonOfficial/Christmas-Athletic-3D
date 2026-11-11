@@ -650,12 +650,12 @@ function createFlyingSantaSleigh(THREE, scale = 1.0) {
 
   // Magical Golden Stardust Trail behind the Sleigh!
   const dustSpheres = [];
-  const dustGeo = new THREE.SphereGeometry(0.24, 6, 6);
-  for (let i = 0; i < 32; i++) {
+  const dustGeo = new THREE.SphereGeometry(0.28, 6, 6);
+  for (let i = 0; i < 36; i++) {
     const dMat = new THREE.MeshBasicMaterial({
       color: i % 2 === 0 ? 0xffe066 : 0xff99cc,
       transparent: true,
-      opacity: 1 - i / 32
+      opacity: 1 - i / 36
     });
     const sp = new THREE.Mesh(dustGeo, dMat);
     sp.position.set(
@@ -667,31 +667,78 @@ function createFlyingSantaSleigh(THREE, scale = 1.0) {
     dustSpheres.push(sp);
   }
 
+  // Animated Parachuting Christmas Gifts Dropping from Santa's Sleigh!
+  const droppingGifts = [];
+  const giftCols = [0xff1744, 0x00e676, 0xffea00, 0x00b0ff];
+  for (let g = 0; g < 4; g++) {
+    const gGroup = new THREE.Group();
+    const box = new THREE.Mesh(
+      new THREE.BoxGeometry(0.85, 0.85, 0.85),
+      new THREE.MeshBasicMaterial({ color: giftCols[g % giftCols.length] })
+    );
+    gGroup.add(box);
+    const chute = new THREE.Mesh(
+      new THREE.SphereGeometry(0.95, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide })
+    );
+    chute.position.y = 1.1;
+    gGroup.add(chute);
+    fleetGroup.add(gGroup);
+    droppingGifts.push({ mesh: gGroup, offsetPhase: g * 1.57 });
+  }
+
+  // Glowing Overhead Banner Sprite ("🎅 HO! HO! HO! SANTA CLAUS")
+  const bannerCanvas = createTextCanvas('🎅 HO! HO! HO! MERRY CHRISTMAS!', 768, 128, {
+    font: '900 44px "Segoe UI", Arial, sans-serif',
+    color: '#fff59d',
+    outlineColor: '#b71c1c',
+    glowColor: '#ffab00'
+  });
+  const bannerTex = new THREE.CanvasTexture(bannerCanvas);
+  const bannerSprite = new THREE.Sprite(
+    new THREE.SpriteMaterial({ map: bannerTex, transparent: true })
+  );
+  bannerSprite.scale.set(14.5, 2.4, 1);
+  bannerSprite.position.set(0, 5.2, 4.0);
+  fleetGroup.add(bannerSprite);
+
   fleetGroup.scale.setScalar(scale);
 
   fleetGroup.userData = {
     santa,
     reindeerList,
     dustSpheres,
+    droppingGifts,
     update(delta, time) {
-      // Santa waving
+      // Santa waving energetically
       if (santa.userData.rightArm) {
-        santa.userData.rightArm.rotation.z = -0.55 + Math.sin(time * 5.0) * 0.35;
+        santa.userData.rightArm.rotation.z = -0.55 + Math.sin(time * 6.5) * 0.45;
       }
       // Reindeer galloping motion
       reindeerList.forEach(item => {
-        const p = time * 8.0 + item.phase;
-        item.mesh.position.y = item.baseY + Math.sin(p) * 0.25;
-        item.mesh.rotation.x = Math.cos(p) * 0.14;
+        const p = time * 9.5 + item.phase;
+        item.mesh.position.y = item.baseY + Math.sin(p) * 0.32;
+        item.mesh.rotation.x = Math.cos(p) * 0.18;
         item.mesh.userData.legs.forEach((leg, lIdx) => {
-          leg.rotation.x = Math.sin(p + (lIdx < 2 ? 0 : Math.PI)) * 0.65;
+          leg.rotation.x = Math.sin(p + (lIdx < 2 ? 0 : Math.PI)) * 0.75;
         });
       });
       // Sparkling stardust trail
       dustSpheres.forEach((sp, idx) => {
         sp.position.y = 1.2 + Math.sin(time * 6.0 + idx * 0.5) * 0.45;
         const s = 0.6 + 0.5 * Math.sin(time * 8.0 + idx);
-        sp.scale.setScalar(s * (1 - idx / 36));
+        sp.scale.setScalar(s * (1 - idx / 38));
+      });
+      // Parachuting gifts dropping below Santa's sleigh
+      droppingGifts.forEach((dg, idx) => {
+        const cycle = ((time * 0.65 + idx * 0.25) % 1.0);
+        dg.mesh.position.set(
+          Math.sin(time * 2.5 + idx) * 1.8,
+          0.5 - cycle * 9.5,
+          -1.0 - cycle * 8.0
+        );
+        dg.mesh.rotation.y = time * 2.0 + idx;
+        dg.mesh.scale.setScalar(1.0 - cycle * 0.35);
       });
     }
   };
@@ -703,12 +750,12 @@ function createFlyingSantaSleigh(THREE, scale = 1.0) {
 function createSantaWonderlandSky(THREE, courseLength = 220) {
   const skyGroup = new THREE.Group();
 
-  // A. Giant Glowing Full Moon (Ahead in the sky so Santa's Sleigh flies across it!)
+  // A. Giant Glowing Full Moon (Positioned directly in front view above the horizon!)
   const moonGroup = new THREE.Group();
-  moonGroup.position.set(-38, 68, courseLength * 0.75 + 70);
+  moonGroup.position.set(-18, 32, courseLength * 0.55 + 50);
 
   const moonMesh = new THREE.Mesh(
-    new THREE.SphereGeometry(16, 24, 24),
+    new THREE.SphereGeometry(14, 24, 24),
     new THREE.MeshBasicMaterial({ color: 0xfff8d6 })
   );
   moonGroup.add(moonMesh);
@@ -729,7 +776,7 @@ function createSantaWonderlandSky(THREE, courseLength = 220) {
   const haloSprite = new THREE.Sprite(
     new THREE.SpriteMaterial({ map: haloTex, transparent: true, blending: THREE.AdditiveBlending })
   );
-  haloSprite.scale.set(78, 78, 1);
+  haloSprite.scale.set(68, 68, 1);
   moonGroup.add(haloSprite);
 
   skyGroup.add(moonGroup);
@@ -740,58 +787,59 @@ function createSantaWonderlandSky(THREE, courseLength = 220) {
   const starPos = new Float32Array(starCount * 3);
   for (let i = 0; i < starCount; i++) {
     const theta = Math.random() * Math.PI * 2;
-    const phi = Math.random() * Math.PI * 0.45;
-    const r = 260 + Math.random() * 80;
+    const phi = Math.random() * Math.PI * 0.48;
+    const r = 220 + Math.random() * 80;
     starPos[i * 3 + 0] = Math.sin(phi) * Math.cos(theta) * r;
-    starPos[i * 3 + 1] = Math.cos(phi) * r * 0.65 + 25;
+    starPos[i * 3 + 1] = Math.cos(phi) * r * 0.45 + 10;
     starPos[i * 3 + 2] = (courseLength * 0.5) + Math.sin(phi) * Math.sin(theta) * r;
   }
   starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
   const starMat = new THREE.PointsMaterial({
     color: 0xfff8e7,
-    size: 1.15,
+    size: 1.25,
     transparent: true,
-    opacity: 0.9,
+    opacity: 0.92,
     blending: THREE.AdditiveBlending
   });
   const stars = new THREE.Points(starGeo, starMat);
   skyGroup.add(stars);
 
-  // C. Shimmering Aurora Borealis Ribbons across the Heavens!
+  // C. Shimmering Aurora Borealis Ribbons across the Heavens (Directly visible in forward view!)
   const auroraRibbons = [];
   const auroraCols = [0x00ffaa, 0x00e5ff, 0xff44cc, 0x55ff99];
 
   for (let a = 0; a < 4; a++) {
     const pts = [];
-    const zStart = -40 + a * 45;
+    const zStart = 10 + a * 38;
     for (let k = 0; k <= 24; k++) {
       const t = k / 24;
-      const ax = (t - 0.5) * 260 + Math.sin(t * Math.PI * 3 + a) * 25;
-      const ay = 58 + a * 7 + Math.cos(t * Math.PI * 2 + a) * 6;
-      const az = zStart + t * (courseLength + 90) * 0.6 + Math.sin(t * Math.PI * 2) * 30;
+      const ax = (t - 0.5) * 200 + Math.sin(t * Math.PI * 3 + a) * 20;
+      const ay = 26 + a * 5 + Math.cos(t * Math.PI * 2 + a) * 4;
+      const az = zStart + t * (courseLength + 60) * 0.55 + Math.sin(t * Math.PI * 2) * 22;
       pts.push(new THREE.Vector3(ax, ay, az));
     }
     const curve = new THREE.CatmullRomCurve3(pts);
-    const tubeGeo = new THREE.TubeGeometry(curve, 48, 3.8, 8, false);
+    const tubeGeo = new THREE.TubeGeometry(curve, 48, 3.2, 8, false);
     const tubeMat = new THREE.MeshBasicMaterial({
       color: auroraCols[a % auroraCols.length],
       transparent: true,
-      opacity: 0.24,
+      opacity: 0.28,
       blending: THREE.AdditiveBlending,
       side: THREE.DoubleSide
     });
     const ribbon = new THREE.Mesh(tubeGeo, tubeMat);
-    ribbon.scale.set(1, 3.2, 1);
+    ribbon.scale.set(1, 2.8, 1);
     skyGroup.add(ribbon);
     auroraRibbons.push({ mesh: ribbon, baseY: ribbon.position.y, phase: a * 1.4 });
   }
 
   skyGroup.userData = {
     auroraRibbons,
+    moonGroup,
     update(delta, time) {
       auroraRibbons.forEach((ar, idx) => {
-        ar.mesh.position.x = Math.sin(time * 0.4 + ar.phase) * 6.0;
-        ar.mesh.material.opacity = 0.18 + 0.10 * Math.sin(time * 1.2 + idx);
+        ar.mesh.position.x = Math.sin(time * 0.5 + ar.phase) * 7.0;
+        ar.mesh.material.opacity = 0.22 + 0.12 * Math.sin(time * 1.4 + idx);
       });
     }
   };

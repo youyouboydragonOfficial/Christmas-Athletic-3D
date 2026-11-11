@@ -647,30 +647,236 @@ class GimmickFactory {
     return group;
   }
 
-  // 10. Spinning Candy Cane Sweeper Hazard
-  createSpinningSweeper(length = 6.5, speed = 1.6) {
+  // 10. Multi-Type Map-Specific Christmas Traps (8 Distinct Trap Types so maps never repeat!)
+  createStageTrap(trapTypeIndex = 0, speedScale = 1.0, phaseOffset = 0) {
     const THREE = this.THREE;
+    const typeMod = ((trapTypeIndex % 8) + 8) % 8;
     const group = new THREE.Group();
 
-    const hub = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.55, 0.55, 0.8, 12),
-      this.presentGoldMat
-    );
-    group.add(hub);
+    if (typeMod === 0) {
+      // Trap 0: Giant Swinging Candy Pendulum Guillotine ("巨大キャンディ振り子トラップ")
+      const frameH = 5.4;
+      [-2.8, 2.8].forEach(px => {
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, frameH, 8), this.woodLogMat);
+        post.position.set(px, frameH / 2, 0);
+        group.add(post);
+      });
+      const topBeam = new THREE.Mesh(new THREE.BoxGeometry(6.0, 0.28, 0.28), this.woodLogMat);
+      topBeam.position.set(0, frameH, 0);
+      group.add(topBeam);
 
-    const bar = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.24, 0.24, length, 10),
-      this.candyRedMat
-    );
-    bar.rotation.z = Math.PI / 2;
-    group.add(bar);
+      const pivot = new THREE.Group();
+      pivot.position.set(0, frameH, 0);
+      const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 4.2, 8), this.candyWhiteMat);
+      rod.position.y = -2.1;
+      pivot.add(rod);
 
-    group.userData = {
-      type: GimmickType.SPINNING_HAZARD,
-      length,
-      speed
-    };
+      const blade = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 0.45, 16), this.candyRedMat);
+      blade.rotation.x = Math.PI / 2;
+      blade.position.y = -4.2;
+      pivot.add(blade);
+      group.add(pivot);
+
+      group.userData = {
+        trapName: '巨大キャンディ振り子',
+        update(delta, time, playerPos, onHit) {
+          const ang = Math.sin(time * 2.4 * speedScale + phaseOffset) * 0.95;
+          pivot.rotation.z = ang;
+          const bx = group.position.x + Math.sin(ang) * 4.2;
+          const by = group.position.y + frameH - Math.cos(ang) * 4.2;
+          const bz = group.position.z;
+          if (Math.hypot(playerPos.x - bx, playerPos.z - bz) < 1.35 && Math.abs(playerPos.y + 0.8 - by) < 1.35) {
+            onHit();
+          }
+        }
+      };
+    } else if (typeMod === 1) {
+      // Trap 1: Rolling Giant Snowball Boulder ("転がる大雪玉トラップ")
+      const ball = new THREE.Mesh(new THREE.SphereGeometry(1.15, 14, 14), this.snowMat);
+      ball.position.y = 1.15;
+      group.add(ball);
+
+      group.userData = {
+        trapName: '転がる巨大雪玉',
+        update(delta, time, playerPos, onHit) {
+          const offset = Math.sin(time * 2.2 * speedScale + phaseOffset) * 2.2;
+          ball.position.x = offset;
+          ball.rotation.z = -offset * 1.2;
+          const wx = group.position.x + offset;
+          const wy = group.position.y + 1.15;
+          const wz = group.position.z;
+          if (Math.hypot(playerPos.x - wx, playerPos.z - wz) < 1.3 && Math.abs(playerPos.y + 0.7 - wy) < 1.3) {
+            onHit();
+          }
+        }
+      };
+    } else if (typeMod === 2) {
+      // Trap 2: Pop-Up Jack-in-the-Box Star Bumper ("びっくり箱飛び出しトラップ")
+      const box = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.2, 1.5), this.presentBlueMat);
+      box.position.y = 0.6;
+      group.add(box);
+
+      const springStar = new THREE.Mesh(new THREE.OctahedronGeometry(0.95, 0), this.goldCoinMat);
+      springStar.position.y = 1.2;
+      group.add(springStar);
+
+      group.userData = {
+        trapName: 'びっくり箱スターバンパー',
+        update(delta, time, playerPos, onHit) {
+          const pop = Math.max(0, Math.sin(time * 3.2 * speedScale + phaseOffset));
+          springStar.position.y = 0.8 + pop * 2.2;
+          springStar.rotation.y += 4.0 * delta;
+          springStar.scale.setScalar(0.5 + pop * 0.7);
+          if (pop > 0.45) {
+            const d = Math.hypot(playerPos.x - group.position.x, playerPos.z - group.position.z);
+            if (d < 1.4 && Math.abs(playerPos.y - group.position.y) < 2.2) {
+              onHit();
+            }
+          }
+        }
+      };
+    } else if (typeMod === 3) {
+      // Trap 3: Patrolling Nutcracker Toy Soldier ("行進するくるみ割り人形トラップ")
+      const soldier = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 1.4, 10), this.presentRedMat);
+      body.position.y = 0.7;
+      soldier.add(body);
+      const hat = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.45, 0.75, 10), this.woodLogMat);
+      hat.position.y = 1.75;
+      soldier.add(hat);
+      group.add(soldier);
+
+      group.userData = {
+        trapName: 'くるみ割り人形の行進',
+        update(delta, time, playerPos, onHit) {
+          const oz = Math.sin(time * 2.3 * speedScale + phaseOffset) * 1.9;
+          soldier.position.z = oz;
+          soldier.rotation.y = Math.cos(time * 2.3 * speedScale + phaseOffset) >= 0 ? 0 : Math.PI;
+          const wx = group.position.x;
+          const wz = group.position.z + oz;
+          if (Math.hypot(playerPos.x - wx, playerPos.z - wz) < 1.15 && Math.abs(playerPos.y - group.position.y) < 1.8) {
+            onHit();
+          }
+        }
+      };
+    } else if (typeMod === 4) {
+      // Trap 4: Falling Giant Crystal Icicle ("落下する大つららトラップ")
+      const warnRing = new THREE.Mesh(
+        new THREE.RingGeometry(0.7, 1.1, 20),
+        this.glowPadMat
+      );
+      warnRing.rotation.x = -Math.PI / 2;
+      warnRing.position.y = 0.08;
+      group.add(warnRing);
+
+      const icicle = new THREE.Mesh(new THREE.ConeGeometry(0.75, 2.8, 7), this.iceCrystalMat);
+      icicle.rotation.x = Math.PI;
+      icicle.position.y = 6.0;
+      group.add(icicle);
+
+      group.userData = {
+        trapName: '落下する大つらら',
+        update(delta, time, playerPos, onHit) {
+          const cycle = (time * 0.9 * speedScale + phaseOffset) % 1.0;
+          const iy = 6.5 - cycle * 6.5;
+          icicle.position.y = iy;
+          warnRing.scale.setScalar(0.6 + cycle * 0.6);
+          if (iy < 2.2) {
+            const d = Math.hypot(playerPos.x - group.position.x, playerPos.z - group.position.z);
+            if (d < 1.25 && Math.abs(playerPos.y - group.position.y) < 1.8) {
+              onHit();
+            }
+          }
+        }
+      };
+    } else if (typeMod === 5) {
+      // Trap 5: Vertical Rotating Peppermint Saw Wheel ("回転ペパーミントホイール")
+      const wheel = new THREE.Group();
+      wheel.position.y = 1.4;
+      const disk = new THREE.Mesh(new THREE.CylinderGeometry(1.55, 1.55, 0.28, 20), this.candyRedMat);
+      disk.rotation.z = Math.PI / 2;
+      wheel.add(disk);
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(1.55, 0.16, 8, 20), this.candyWhiteMat);
+      rim.rotation.y = Math.PI / 2;
+      wheel.add(rim);
+      group.add(wheel);
+
+      group.userData = {
+        trapName: '回転ペパーミントホイール',
+        update(delta, time, playerPos, onHit) {
+          const ox = Math.sin(time * 2.0 * speedScale + phaseOffset) * 1.9;
+          wheel.position.x = ox;
+          wheel.rotation.x += 6.0 * delta;
+          const wx = group.position.x + ox;
+          const wz = group.position.z;
+          if (Math.abs(playerPos.x - wx) < 0.75 && Math.abs(playerPos.z - wz) < 1.55 && Math.abs(playerPos.y - group.position.y) < 2.1) {
+            onHit();
+          }
+        }
+      };
+    } else if (typeMod === 6) {
+      // Trap 6: Sweeping Starlight Laser Barrier ("動くスターライトレーザー")
+      const beamGroup = new THREE.Group();
+      const beam = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.14, 0.14, 4.8, 10),
+        new THREE.MeshBasicMaterial({ color: 0xff1744 })
+      );
+      beam.rotation.z = Math.PI / 2;
+      beam.position.y = 0.75;
+      beamGroup.add(beam);
+      group.add(beamGroup);
+
+      group.userData = {
+        trapName: 'スターライトレーザー',
+        update(delta, time, playerPos, onHit) {
+          const oz = Math.sin(time * 2.4 * speedScale + phaseOffset) * 2.0;
+          beamGroup.position.z = oz;
+          const wz = group.position.z + oz;
+          if (
+            Math.abs(playerPos.z - wz) < 0.55 &&
+            Math.abs(playerPos.x - group.position.x) < 2.3 &&
+            playerPos.y >= group.position.y - 0.2 &&
+            playerPos.y <= group.position.y + 1.05
+          ) {
+            onHit();
+          }
+        }
+      };
+    } else {
+      // Trap 7: Classic Spinning Candy Cane Sweeper ("回転キャンディスピナー")
+      const hub = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.5, 0.5, 0.8, 12),
+        this.presentGoldMat
+      );
+      hub.position.y = 0.4;
+      group.add(hub);
+
+      const bar = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.22, 0.22, 4.8, 10),
+        this.candyRedMat
+      );
+      bar.rotation.z = Math.PI / 2;
+      bar.position.y = 0.55;
+      group.add(bar);
+
+      group.userData = {
+        trapName: '回転キャンディスピナー',
+        update(delta, time, playerPos, onHit) {
+          bar.rotation.y += 2.2 * speedScale * delta;
+          const d = Math.hypot(playerPos.x - group.position.x, playerPos.z - group.position.z);
+          if (d < 2.2 && playerPos.y >= group.position.y - 0.2 && playerPos.y <= group.position.y + 0.95) {
+            onHit();
+          }
+        }
+      };
+    }
+
     return group;
+  }
+
+  // Legacy wrapper kept for compatibility
+  createSpinningSweeper(length = 4.8, speed = 1.6) {
+    return this.createStageTrap(7, speed / 1.6, 0);
   }
 }
 
