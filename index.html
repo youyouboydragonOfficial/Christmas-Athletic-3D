@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Christmas Athletic 3D - 1000 Stages Winter Adventure</title>
+  <title>Christmas Athletic 3D - 1000 Stages Winter Parkour</title>
   <style>
     * {
       box-sizing: border-box;
@@ -16,8 +16,8 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #0b1420;
+      font-family: 'Segoe UI', 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
+      background-color: #1a2142;
       color: #ffffff;
     }
     #game-container {
@@ -29,214 +29,388 @@
       z-index: 1;
     }
 
-    /* Top HUD */
-    #hud {
+    /* 3D World Floating Labels ("雪の足場", "巨大なプレゼント", "動く床") */
+    #world-labels-container {
       position: absolute;
-      top: 16px;
-      left: 16px;
-      right: 16px;
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      z-index: 10;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 5;
+      overflow: hidden;
+    }
+    .world-floating-label {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      font-size: 23px;
+      font-weight: 900;
+      color: #ffffff;
+      letter-spacing: 1px;
+      white-space: nowrap;
+      text-shadow:
+        -2px -2px 0 #0d152b,
+         2px -2px 0 #0d152b,
+        -2px  2px 0 #0d152b,
+         2px  2px 0 #0d152b,
+         0px  4px 12px rgba(0, 0, 0, 0.85);
       pointer-events: none;
     }
-    .hud-card {
-      background: rgba(14, 25, 45, 0.75);
-      backdrop-filter: blur(10px);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      border-radius: 14px;
-      padding: 12px 20px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.37);
-      pointer-events: auto;
-    }
-    #hud-stage-title {
-      font-size: 20px;
-      font-weight: 700;
-      color: #ffd700;
-      text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
-      margin-bottom: 4px;
-    }
-    #hud-gimmick {
-      font-size: 13px;
-      color: #aae0ff;
-      letter-spacing: 0.5px;
-    }
 
-    .hud-stats {
+    /* Top-Left Player Status HUD (Avatar + HP + Stamina + Snowflake Counter) */
+    #top-left-hud {
+      position: absolute;
+      top: 14px;
+      left: 18px;
+      z-index: 15;
       display: flex;
-      gap: 16px;
+      flex-direction: column;
+      gap: 6px;
+      pointer-events: none;
     }
-    .stat-badge {
+    .status-main-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: linear-gradient(90deg, rgba(15, 23, 48, 0.78) 0%, rgba(15, 23, 48, 0.35) 85%, transparent 100%);
+      padding: 6px 24px 6px 8px;
+      border-radius: 40px;
+    }
+    .avatar-circle {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      border: 3px solid #a8d8ff;
+      box-shadow: 0 0 14px rgba(102, 204, 255, 0.6), inset 0 0 10px rgba(0,0,0,0.5);
+      background: radial-gradient(circle at 50% 35%, #3a4f8c, #182246);
+      overflow: hidden;
+      flex-shrink: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .bars-column {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      min-width: 195px;
+    }
+    .bar-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .bar-label {
+      font-size: 13px;
+      font-weight: 900;
+      color: #ffffff;
+      width: 56px;
+      text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.9);
+    }
+    .bar-track {
+      width: 135px;
+      height: 13px;
+      background: rgba(15, 20, 35, 0.85);
+      border: 1.5px solid rgba(255, 255, 255, 0.35);
+      border-radius: 4px;
+      overflow: hidden;
+      box-shadow: inset 0 2px 5px rgba(0,0,0,0.7);
+    }
+    #hp-bar-fill {
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, #32cd32, #7cfc00);
+      box-shadow: 0 0 8px #50fa7b;
+      transition: width 0.2s ease;
+    }
+    #stamina-bar-fill {
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, #ff8c00, #ffd700);
+      box-shadow: 0 0 8px #ffb86c;
+      transition: width 0.1s ease;
+    }
+    .snowflake-counter-row {
       display: flex;
       align-items: center;
       gap: 6px;
-      font-size: 16px;
-      font-weight: bold;
-      background: rgba(255, 255, 255, 0.1);
-      padding: 6px 14px;
-      border-radius: 20px;
-      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding-left: 10px;
+      font-size: 22px;
+      font-weight: 900;
+      color: #ffffff;
+      text-shadow: 0 2px 6px rgba(0,0,0,0.9), 0 0 10px rgba(102, 238, 255, 0.6);
     }
-    .stat-badge span.icon {
-      font-size: 18px;
+    .snowflake-icon {
+      color: #99f2ff;
+      font-size: 25px;
+      filter: drop-shadow(0 0 6px #00e5ff);
     }
 
-    /* Controls Bar at bottom */
-    #controls-bar {
+    /* Top Header Bar (STAGE | TIMER | PLAYERS) */
+    #top-header-bar {
       position: absolute;
-      bottom: 16px;
-      left: 16px;
-      right: 16px;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-38%);
+      z-index: 15;
       display: flex;
-      justify-content: space-between;
-      align-items: flex-end;
-      z-index: 10;
+      align-items: center;
+      gap: 36px;
+      background: linear-gradient(90deg, transparent 0%, rgba(12, 18, 40, 0.82) 12%, rgba(12, 18, 40, 0.82) 88%, transparent 100%);
+      border-top: 1px solid rgba(255, 215, 0, 0.35);
+      border-bottom: 1px solid rgba(255, 215, 0, 0.35);
+      padding: 8px 48px;
+      white-space: nowrap;
       pointer-events: none;
     }
-    .controls-guide {
-      font-size: 12px;
-      color: rgba(255, 255, 255, 0.85);
-      background: rgba(14, 25, 45, 0.7);
-      backdrop-filter: blur(8px);
-      padding: 8px 16px;
-      border-radius: 10px;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      line-height: 1.6;
+    .header-item {
+      font-size: 19px;
+      font-weight: 900;
+      letter-spacing: 0.8px;
+      text-shadow: 0 2px 6px rgba(0, 0, 0, 0.95);
     }
-    .key-badge {
-      display: inline-block;
-      background: #2a3e5c;
-      border: 1px solid #6688aa;
-      border-radius: 4px;
-      padding: 1px 6px;
-      font-weight: bold;
-      font-size: 11px;
-      margin: 0 2px;
+    #hud-stage-name {
+      color: #ffe066;
+    }
+    #hud-timer {
+      color: #fff3b0;
+      font-variant-numeric: tabular-nums;
+    }
+    #hud-players {
+      color: #ffe066;
     }
 
-    /* Quick Buttons */
-    .button-group {
-      display: flex;
-      gap: 10px;
-      pointer-events: auto;
+    /* Center "REACH THE GOAL!" Banner */
+    #center-banner {
+      position: absolute;
+      top: 66px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 14;
+      background: linear-gradient(90deg, transparent 0%, rgba(16, 24, 52, 0.78) 20%, rgba(16, 24, 52, 0.78) 80%, transparent 100%);
+      border-top: 1px solid rgba(255, 255, 255, 0.25);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.25);
+      padding: 6px 76px;
+      pointer-events: none;
     }
-    button.game-btn {
-      background: linear-gradient(135deg, #c0392b, #962d22);
-      border: 1px solid rgba(255, 255, 255, 0.3);
+    #center-banner-text {
+      font-size: 26px;
+      font-weight: 900;
+      color: #ffffff;
+      letter-spacing: 1.5px;
+      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.95), 0 0 16px rgba(255, 255, 255, 0.4);
+      white-space: nowrap;
+    }
+
+    /* Bottom-Right Controls Box (Matching Reference Image) */
+    #bottom-right-controls {
+      position: absolute;
+      bottom: 18px;
+      right: 18px;
+      z-index: 15;
+      background: rgba(14, 20, 38, 0.82);
+      border: 1.5px solid rgba(255, 255, 255, 0.22);
+      border-radius: 12px;
+      padding: 12px 18px;
+      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.65);
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      min-width: 175px;
+    }
+    .ctrl-line {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 800;
+      color: #ffffff;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+      cursor: pointer;
+    }
+    .btn-circle {
+      width: 21px;
+      height: 21px;
+      border-radius: 50%;
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 12px;
+      font-weight: 900;
       color: #fff;
-      font-weight: bold;
-      font-size: 13px;
-      padding: 8px 16px;
+      border: 1.5px solid rgba(255,255,255,0.85);
+      box-shadow: 0 0 6px rgba(0,0,0,0.6);
+      flex-shrink: 0;
+    }
+    .btn-a { background: #2ecc71; }
+    .btn-b { background: #e74c3c; }
+    .btn-c { background: #f39c12; }
+    .btn-g { background: #3498db; }
+
+    /* Bottom-Left Quick Utility Bar */
+    #bottom-left-bar {
+      position: absolute;
+      bottom: 18px;
+      left: 18px;
+      z-index: 15;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .quick-btn {
+      background: rgba(16, 25, 48, 0.82);
+      border: 1px solid rgba(168, 216, 255, 0.35);
+      color: #e6f4ff;
+      font-size: 12px;
+      font-weight: 800;
+      padding: 7px 12px;
       border-radius: 8px;
       cursor: pointer;
-      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
       transition: all 0.15s ease;
     }
-    button.game-btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 18px rgba(255, 215, 0, 0.35);
-      background: linear-gradient(135deg, #e74c3c, #c0392b);
-    }
-    button.game-btn.secondary {
-      background: linear-gradient(135deg, #1f4068, #162447);
-    }
-    button.game-btn.secondary:hover {
-      background: linear-gradient(135deg, #28558a, #1f4068);
+    .quick-btn:hover {
+      background: rgba(38, 62, 115, 0.92);
+      border-color: #ffd700;
+      transform: translateY(-1px);
     }
 
-    /* Modals (Clear & Stage Select) */
+    /* Start Screen Overlay */
+    #start-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle at center, rgba(25, 38, 78, 0.88) 0%, rgba(10, 14, 30, 0.95) 100%);
+      backdrop-filter: blur(6px);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 200;
+      cursor: pointer;
+    }
+    #start-overlay.hidden {
+      display: none;
+    }
+    .start-title {
+      font-size: 46px;
+      font-weight: 900;
+      color: #ffe066;
+      text-shadow: 0 0 24px rgba(255, 215, 0, 0.75), 0 4px 12px rgba(0,0,0,0.9);
+      margin-bottom: 10px;
+      text-align: center;
+    }
+    .start-subtitle {
+      font-size: 17px;
+      color: #d0ebff;
+      margin-bottom: 28px;
+      text-align: center;
+      line-height: 1.6;
+    }
+    .start-btn-pulse {
+      background: linear-gradient(135deg, #e63946, #b51724);
+      color: #fff;
+      font-size: 23px;
+      font-weight: 900;
+      padding: 16px 52px;
+      border-radius: 40px;
+      border: 2.5px solid #ffd700;
+      box-shadow: 0 0 32px rgba(255, 215, 0, 0.55);
+      cursor: pointer;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.06); }
+      100% { transform: scale(1); }
+    }
+
+    /* Modals */
     .modal-overlay {
       position: absolute;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
-      background: rgba(5, 10, 20, 0.78);
-      backdrop-filter: blur(12px);
+      background: rgba(8, 13, 28, 0.82);
+      backdrop-filter: blur(10px);
       display: flex;
       justify-content: center;
       align-items: center;
       z-index: 100;
-      transition: opacity 0.25s ease;
     }
     .modal-overlay.hidden {
       display: none;
     }
     .modal-card {
-      background: linear-gradient(145deg, #162238, #0e1624);
+      background: linear-gradient(145deg, #1b2848, #10182c);
       border: 2px solid #ffd700;
       border-radius: 20px;
-      padding: 32px 40px;
+      padding: 28px 36px;
       text-align: center;
-      box-shadow: 0 12px 48px rgba(255, 215, 0, 0.25), 0 0 80px rgba(0, 0, 0, 0.8);
-      max-width: 520px;
-      width: 90%;
+      box-shadow: 0 12px 48px rgba(0, 0, 0, 0.85), 0 0 35px rgba(255, 215, 0, 0.25);
+      max-width: 560px;
+      width: 92%;
     }
     .modal-title {
       font-size: 28px;
-      font-weight: 800;
+      font-weight: 900;
       color: #ffd700;
       margin-bottom: 8px;
-      text-shadow: 0 0 15px rgba(255, 215, 0, 0.6);
+      text-shadow: 0 0 14px rgba(255, 215, 0, 0.6);
     }
     .modal-sub {
-      color: #ccddee;
+      color: #d0e4ff;
       font-size: 14px;
-      margin-bottom: 24px;
+      margin-bottom: 20px;
+      line-height: 1.5;
     }
     .stat-row {
       display: flex;
       justify-content: space-around;
-      margin: 20px 0;
-      background: rgba(255, 255, 255, 0.05);
+      margin: 18px 0;
+      background: rgba(255, 255, 255, 0.06);
       padding: 14px;
       border-radius: 12px;
     }
     .stat-item .val {
-      font-size: 24px;
-      font-weight: bold;
+      font-size: 23px;
+      font-weight: 900;
       color: #fff;
     }
     .stat-item .lbl {
       font-size: 12px;
-      color: #88aacc;
+      color: #99bbdd;
       margin-top: 4px;
     }
 
-    /* Stage Grid in Select Modal */
     #stage-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
       gap: 10px;
-      margin: 18px 0;
-      max-height: 220px;
-      overflow-y: auto;
-      padding: 8px;
+      margin: 14px 0;
     }
     .stage-btn {
-      background: #1b2d48;
-      border: 1px solid #3d5e8c;
-      color: #e0f0ff;
+      background: #213559;
+      border: 1px solid #4a70a8;
+      color: #fff;
       padding: 10px 6px;
       border-radius: 8px;
       font-size: 13px;
-      font-weight: bold;
+      font-weight: 800;
       cursor: pointer;
-      transition: all 0.15s ease;
     }
     .stage-btn:hover {
       background: #ffd700;
-      color: #0b1420;
-      border-color: #ffe066;
-      transform: scale(1.05);
+      color: #0f172a;
     }
     .stage-btn.active {
-      border: 2px solid #ff4444;
-      background: #801818;
+      background: #d62828;
+      border-color: #ffd700;
     }
     .stage-input-box {
-      margin-top: 16px;
+      margin-top: 14px;
       display: flex;
       gap: 10px;
       justify-content: center;
@@ -245,91 +419,183 @@
       width: 120px;
       padding: 8px 12px;
       border-radius: 8px;
-      border: 1px solid #5577aa;
-      background: #0f1c30;
+      border: 1px solid #6688bb;
+      background: #0d1629;
       color: #fff;
       font-size: 15px;
       text-align: center;
       font-weight: bold;
     }
+    .game-btn {
+      background: linear-gradient(135deg, #e63946, #b51724);
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      color: #fff;
+      font-weight: 800;
+      font-size: 14px;
+      padding: 10px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .game-btn.secondary {
+      background: linear-gradient(135deg, #2b4c7e, #1a3054);
+    }
   </style>
 </head>
 <body>
+  <!-- Hidden Audio Player for 100% Reliable Local Playback & Seamless Repeat -->
+  <audio id="bgm-audio" loop preload="auto" src="assets/audio/jingle_bells_fast.mp3"></audio>
+
+  <!-- Start Screen Overlay -->
+  <div id="start-overlay">
+    <div class="start-title">🎄 CHRISTMAS ATHLETIC 3D 🎅</div>
+    <div class="start-subtitle">
+      雪の足場 • 巨大なプレゼント（ネット＆ハシゴ登り） • 雪の結晶大ジャンプ • キャンディの動く床 • 頂上のGOALアーチ＆巨大ツリー<br>
+      全1000ステージ収録 / 歌なしジングルベルBGM
+    </div>
+    <button class="start-btn-pulse" id="btn-start-game">▶ ゲームスタート (BGM ON)</button>
+  </div>
+
+  <!-- 3D WebGL Canvas Container -->
   <div id="game-container"></div>
 
-  <!-- Top HUD -->
-  <div id="hud">
-    <div class="hud-card">
-      <div id="hud-stage-title">Stage 1: Frosty Pine Forest</div>
-      <div id="hud-gimmick">Icy Slippery Platforms • Super Jump Presents</div>
+  <!-- 3D Floating In-World Labels ("雪の足場", "巨大なプレゼント", "動く床") -->
+  <div id="world-labels-container"></div>
+
+  <!-- Top-Left Player Status HUD -->
+  <div id="top-left-hud">
+    <div class="status-main-row">
+      <div class="avatar-circle" title="Player">
+        <!-- SVG Winter Character Portrait with Rainbow Beanie & Scarf -->
+        <svg viewBox="0 0 64 64" width="60" height="60">
+          <defs>
+            <linearGradient id="hatGrad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#ff2e93"/>
+              <stop offset="50%" stop-color="#ffd700"/>
+              <stop offset="100%" stop-color="#00e5ff"/>
+            </linearGradient>
+          </defs>
+          <circle cx="32" cy="32" r="30" fill="#233566"/>
+          <!-- Hair -->
+          <path d="M16 32 C14 44, 18 54, 22 56 L42 56 C46 54, 50 44, 48 32 Z" fill="#5c3317"/>
+          <!-- Face -->
+          <ellipse cx="32" cy="35" rx="12" ry="13" fill="#ffdfc4"/>
+          <!-- Eyes -->
+          <ellipse cx="27.5" cy="34" rx="2" ry="2.4" fill="#2b1b17"/>
+          <ellipse cx="36.5" cy="34" rx="2" ry="2.4" fill="#2b1b17"/>
+          <circle cx="28" cy="33.2" r="0.7" fill="#fff"/>
+          <circle cx="37" cy="33.2" r="0.7" fill="#fff"/>
+          <!-- Smile & Rosy Cheeks -->
+          <circle cx="24.5" cy="38" r="2.2" fill="#ff8fa3" opacity="0.55"/>
+          <circle cx="39.5" cy="38" r="2.2" fill="#ff8fa3" opacity="0.55"/>
+          <path d="M29 40.5 Q32 43 35 40.5" stroke="#b55239" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+          <!-- Rainbow Scarf / Jacket Collar -->
+          <path d="M18 47 Q32 53 46 47 L50 60 L14 60 Z" fill="url(#hatGrad)"/>
+          <!-- Winter Pom-Pom Beanie -->
+          <path d="M18 26 C18 14, 46 14, 46 26 Z" fill="url(#hatGrad)"/>
+          <rect x="17" y="23" width="30" height="5.5" rx="2.7" fill="#f8fafc"/>
+          <circle cx="32" cy="12" r="4.5" fill="#ff55aa"/>
+        </svg>
+      </div>
+      <div class="bars-column">
+        <div class="bar-row">
+          <span class="bar-label">HP</span>
+          <div class="bar-track"><div id="hp-bar-fill"></div></div>
+        </div>
+        <div class="bar-row">
+          <span class="bar-label">スタミナ</span>
+          <div class="bar-track"><div id="stamina-bar-fill"></div></div>
+        </div>
+      </div>
     </div>
-    <div class="hud-stats">
-      <div class="stat-badge">
-        <span class="icon">🔔</span>
-        <span id="hud-bells">0 / 0</span>
-      </div>
-      <div class="stat-badge">
-        <span class="icon">⏱️</span>
-        <span id="hud-timer">0.0s</span>
-      </div>
+    <div class="snowflake-counter-row">
+      <span class="snowflake-icon">❄️</span>
+      <span id="hud-snowflake-count">×12</span>
     </div>
   </div>
 
-  <!-- Bottom Controls & Action Bar -->
-  <div id="controls-bar">
-    <div class="controls-guide">
-      <span class="key-badge">W</span><span class="key-badge">A</span><span class="key-badge">S</span><span class="key-badge">D</span> / <span class="key-badge">↑←↓→</span> 移動 
-      | <span class="key-badge">SPACE</span> ジャンプ 
-      | <span class="key-badge">マウスドラッグ</span> 視点回転 
-      | <span class="key-badge">R</span> リトライ 
-      | <span class="key-badge">ESC</span> ステージ選択
+  <!-- Top Header Bar -->
+  <div id="top-header-bar">
+    <div class="header-item" id="hud-stage-name">STAGE: CHRISTMAS ATHLETIC</div>
+    <div class="header-item" id="hud-timer">TIMER: 00:00.00</div>
+    <div class="header-item" id="hud-players">PLAYERS: 18/30</div>
+  </div>
+
+  <!-- Top-Center Banner -->
+  <div id="center-banner">
+    <div id="center-banner-text">REACH THE GOAL!</div>
+  </div>
+
+  <!-- Bottom-Left Quick Utility Buttons -->
+  <div id="bottom-left-bar">
+    <button class="quick-btn" id="btn-bgm-toggle" onclick="window.soundManager.setMuted(!window.soundManager.isMuted); this.innerText = window.soundManager.isMuted ? '🔇 BGM OFF' : '🎵 BGM ON';">🎵 BGM ON</button>
+    <button class="quick-btn" id="btn-bgm-switch" onclick="const t=['fast','user_fast','calm']; const n=t[(t.indexOf(window.soundManager.currentTrack)+1)%t.length]; window.soundManager.switchTrack(n);">🔔 曲切替 (T)</button>
+    <button class="quick-btn" onclick="window.game.player.respawnAtCheckpoint(); window.game.setBannerText('RESPAWNED AT CHECKPOINT!', 1500);">🔄 チェックポイントへ戻る (R)</button>
+  </div>
+
+  <!-- Bottom-Right Controls Box (Matches Reference Image) -->
+  <div id="bottom-right-controls">
+    <div class="ctrl-line" onclick="window.game.player.triggerJump()">
+      <span class="btn-circle btn-a">A</span>
+      <span>: ジャンプ (Space)</span>
     </div>
-    <div class="button-group">
-      <button class="game-btn secondary" id="btn-track">🎷 Upbeat Band</button>
-      <button class="game-btn secondary" id="btn-mute">🎵 BGM ON</button>
-      <button class="game-btn secondary" id="btn-select-stage">🗺️ ステージ選択 (1-1000)</button>
-      <button class="game-btn" id="btn-retry">🔄 やり直し</button>
+    <div class="ctrl-line">
+      <span class="btn-circle btn-b">B</span>
+      <span>: ダッシュ (Shift)</span>
+    </div>
+    <div class="ctrl-line">
+      <span class="btn-circle btn-c">C</span>
+      <span>: クライミング (W/C)</span>
+    </div>
+    <div class="ctrl-line" id="btn-open-guide">
+      <span class="btn-circle btn-g">G</span>
+      <span>: ゲームガイド (Tab)</span>
     </div>
   </div>
 
   <!-- Stage Clear Modal -->
   <div id="clear-modal" class="modal-overlay hidden">
     <div class="modal-card">
-      <div class="modal-title">⭐ STAGE CLEAR! ⭐</div>
-      <div class="modal-sub">リアルクリスマスツリーの頂点に到達しました！</div>
+      <div class="modal-title">🏆 GOAL! STAGE CLEAR! 🎄</div>
+      <div class="modal-sub">
+        丘の上のGOALアーチ＆巨大クリスマスツリーに到達しました！<br>
+        <span style="color: #ffe066; font-weight: bold;">⚡ 2秒後に次のステージへ自動で進みます...</span>
+      </div>
       <div class="stat-row">
         <div class="stat-item">
           <div class="val" id="clear-stage-num">1</div>
           <div class="lbl">STAGE</div>
         </div>
         <div class="stat-item">
-          <div class="val" id="clear-time">0.0s</div>
-          <div class="lbl">TIME</div>
+          <div class="val" id="clear-time">00:00.00</div>
+          <div class="lbl">CLEAR TIME</div>
         </div>
         <div class="stat-item">
-          <div class="val" id="clear-bells">0 / 0</div>
-          <div class="lbl">BELLS</div>
+          <div class="val" id="clear-bells">❄️ ×12</div>
+          <div class="lbl">SNOWFLAKES</div>
         </div>
       </div>
-      <div style="display: flex; gap: 12px; justify-content: center; margin-top: 20px;">
-        <button class="game-btn" id="btn-next-stage" style="font-size: 16px; padding: 12px 24px;">🎁 次のステージへ</button>
-      </div>
+      <button class="game-btn" id="btn-next-stage">🎁 すぐ次のステージへ進む</button>
     </div>
   </div>
 
-  <!-- Stage Select Modal (1 to 1000) -->
+  <!-- Game Guide & Stage Select Modal (1 - 1000) -->
   <div id="stage-select-modal" class="modal-overlay hidden">
-    <div class="modal-card" style="max-width: 580px;">
-      <div class="modal-title">🗺️ ステージ選択 (全1000ステージ)</div>
-      <div class="modal-sub">好きなステージ番号を入力してジャンプするか、主要ステージを選んでください</div>
-      
+    <div class="modal-card">
+      <div class="modal-title">🗺️ ゲームガイド ＆ ステージ選択 (全1000ステージ)</div>
+      <div class="modal-sub" style="text-align: left; background: rgba(0,0,0,0.3); padding: 12px 16px; border-radius: 10px;">
+        • <b>移動</b>: <b>W / A / S / D</b> または <b>矢印キー</b>（キーを離すとピタッと止まります）<br>
+        • <b>ジャンプ / 2段ジャンプ</b>: <b>Space</b> キー<br>
+        • <b>ダッシュ</b>: <b>Shift</b> または <b>B</b> キー（スタミナを消費）<br>
+        • <b>クライミング</b>: 巨大なプレゼントのネットやハシゴに近づいて <b>W</b> または <b>C</b> キーで登れます<br>
+        • <b>雪の結晶ジャンプ台</b>: 中央の巨大な雪の結晶に乗ると光の軌道に沿って大ジャンプ！<br>
+        • <b>ガイド表示切替</b>: <b>G</b> キーで画面内の「雪の足場」「巨大なプレゼント」「動く床」ラベルをON/OFF
+      </div>
+
       <div id="stage-grid"></div>
 
       <div class="stage-input-box">
         <input type="number" id="input-stage-num" min="1" max="1000" placeholder="1〜1000" value="1">
-        <button class="game-btn" id="btn-jump-stage">🚀 このステージへ</button>
-      </div>
-      <div style="margin-top: 18px;">
+        <button class="game-btn" id="btn-jump-stage">🚀 ステージ移動</button>
         <button class="game-btn secondary" id="btn-close-select">閉じる</button>
       </div>
     </div>
@@ -343,5 +609,13 @@
   <script src="src/stage-generator.js"></script>
   <script src="src/player.js"></script>
   <script src="src/game.js"></script>
+  <script>
+    document.getElementById('start-overlay').addEventListener('click', () => {
+      document.getElementById('start-overlay').classList.add('hidden');
+      if (window.soundManager) {
+        window.soundManager.playBGM();
+      }
+    });
+  </script>
 </body>
 </html>

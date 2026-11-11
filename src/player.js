@@ -1,141 +1,188 @@
-// player.js - 3D Character, Platformer Physics, Input Handling, and Camera Controls
+// player.js - Articulated Winter Parkour Character (Rainbow Puffer Jacket) + Climbing, Dash, Stamina/HP & AI Challengers
+
+function createWinterCharacterMesh(THREE, palette = null) {
+  const root = new THREE.Group();
+
+  const stripeCols = palette || [0xffcc00, 0x00e5ff, 0xff2a85, 0x7c4dff];
+  const pantsMat = new THREE.MeshStandardMaterial({ color: 0x00838f, roughness: 0.65 });
+  const bootMat = new THREE.MeshStandardMaterial({ color: 0x263238, roughness: 0.7 });
+  const skinMat = new THREE.MeshStandardMaterial({ color: 0xffd1b3, roughness: 0.55 });
+  const gloveMat = new THREE.MeshStandardMaterial({ color: 0x00b0ff, roughness: 0.5 });
+
+  // Torso (Segmented Rainbow Puffer Jacket matching the reference image!)
+  const torsoGroup = new THREE.Group();
+  torsoGroup.position.y = 1.05;
+  for (let i = 0; i < 4; i++) {
+    const segMat = new THREE.MeshStandardMaterial({
+      color: stripeCols[i % stripeCols.length],
+      roughness: 0.42
+    });
+    const rTop = 0.36 - (i === 3 ? 0.04 : 0);
+    const rBot = 0.38 - i * 0.01;
+    const seg = new THREE.Mesh(
+      new THREE.CylinderGeometry(rTop, rBot, 0.21, 14),
+      segMat
+    );
+    seg.position.y = -0.3 + i * 0.2;
+    seg.castShadow = true;
+    torsoGroup.add(seg);
+  }
+
+  // Puffy Yellow Collar / Hood on back of neck
+  const hoodMat = new THREE.MeshStandardMaterial({ color: 0xffd600, roughness: 0.45 });
+  const hood = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.11, 8, 16), hoodMat);
+  hood.rotation.x = Math.PI / 2 + 0.2;
+  hood.position.set(0, 0.44, -0.05);
+  torsoGroup.add(hood);
+  root.add(torsoGroup);
+
+  // Head & Striped Pom-Pom Beanie
+  const headGroup = new THREE.Group();
+  headGroup.position.y = 1.72;
+
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 14, 14), skinMat);
+  head.castShadow = true;
+  headGroup.add(head);
+
+  // Beanie Hat layers
+  const beanieCols = [0x00e5ff, 0xffd600, 0xff2a85];
+  beanieCols.forEach((col, idx) => {
+    const bRing = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.29 - idx * 0.05, 0.30 - idx * 0.04, 0.12, 14),
+      new THREE.MeshStandardMaterial({ color: col, roughness: 0.6 })
+    );
+    bRing.position.y = 0.12 + idx * 0.1;
+    headGroup.add(bRing);
+  });
+
+  const pompom = new THREE.Mesh(
+    new THREE.SphereGeometry(0.11, 10, 10),
+    new THREE.MeshStandardMaterial({ color: 0xff4081, roughness: 0.8 })
+  );
+  pompom.position.y = 0.44;
+  headGroup.add(pompom);
+  root.add(headGroup);
+
+  // Articulated Arms (Left & Right)
+  const makeArm = (side) => {
+    const armPivot = new THREE.Group();
+    armPivot.position.set(side * 0.44, 1.38, 0);
+
+    for (let s = 0; s < 3; s++) {
+      const sleeve = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.11, 0.10, 0.18, 10),
+        new THREE.MeshStandardMaterial({ color: stripeCols[(s + 1) % stripeCols.length], roughness: 0.45 })
+      );
+      sleeve.position.y = -0.1 - s * 0.16;
+      sleeve.castShadow = true;
+      armPivot.add(sleeve);
+    }
+
+    const glove = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 8), gloveMat);
+    glove.position.y = -0.58;
+    armPivot.add(glove);
+
+    return armPivot;
+  };
+
+  const leftArm = makeArm(-1);
+  const rightArm = makeArm(1);
+  root.add(leftArm);
+  root.add(rightArm);
+
+  // Articulated Legs (Left & Right)
+  const makeLeg = (side) => {
+    const legPivot = new THREE.Group();
+    legPivot.position.set(side * 0.19, 0.72, 0);
+
+    const thigh = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.12, 0.38, 10), pantsMat);
+    thigh.position.y = -0.19;
+    thigh.castShadow = true;
+    legPivot.add(thigh);
+
+    // Colorful leg warmer stripes
+    const warmer = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.125, 0.12, 0.22, 10),
+      new THREE.MeshStandardMaterial({ color: 0xff2a85, roughness: 0.5 })
+    );
+    warmer.position.y = -0.45;
+    legPivot.add(warmer);
+
+    const boot = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.18, 0.34), bootMat);
+    boot.position.set(0, -0.63, 0.04);
+    boot.castShadow = true;
+    legPivot.add(boot);
+
+    return legPivot;
+  };
+
+  const leftLeg = makeLeg(-1);
+  const rightLeg = makeLeg(1);
+  root.add(leftLeg);
+  root.add(rightLeg);
+
+  root.userData = { torsoGroup, headGroup, leftArm, rightArm, leftLeg, rightLeg };
+  return root;
+}
 
 class Player {
   constructor(THREE, scene) {
     this.THREE = THREE;
     this.scene = scene;
 
-    // Movement & Physics
-    this.position = new THREE.Vector3(0, 3, 0);
+    this.position = new THREE.Vector3(0, 2.5, 0);
     this.velocity = new THREE.Vector3(0, 0, 0);
-    this.radius = 0.55;
-    this.height = 1.6;
+    this.checkpointPos = new THREE.Vector3(0, 2.5, 0);
+
+    this.radius = 0.52;
+    this.height = 1.9;
 
     this.isGrounded = false;
+    this.isClimbing = false;
     this.groundPlatform = null;
-    this.currentFriction = 0.85;
+    this.currentFriction = 0.88;
 
-    // Coyote time & Jump buffer
     this.coyoteTimer = 0;
     this.jumpBufferTimer = 0;
+    this.jumpsRemaining = 2; // Supports Double Jump!
 
-    // Controls input state
+    // HP & Stamina (Matching top-left HUD in the image!)
+    this.hp = 100;
+    this.maxHp = 100;
+    this.stamina = 100;
+    this.maxStamina = 100;
+    this.invincibleTimer = 0;
+
+    this.animTime = 0;
+
     this.input = {
       forward: false,
       backward: false,
       left: false,
       right: false,
-      jump: false
+      jump: false,
+      dash: false,
+      climb: false
     };
 
-    // Camera parameters
-    this.cameraYaw = 0;
-    this.cameraPitch = 0.28;
-    this.cameraDistance = 7.0;
+    // Camera Orbit (Behind Player looking down the course toward the GOAL!)
+    this.cameraYaw = Math.PI; // Facing +Z toward the course
+    this.cameraPitch = 0.26;
+    this.cameraDistance = 8.2;
 
-    this.createModel();
+    this.mesh = createWinterCharacterMesh(THREE);
+    this.scene.add(this.mesh);
     this.createShadow();
   }
 
-  createModel() {
-    const THREE = this.THREE;
-    this.mesh = new THREE.Group();
-
-    // Body (Puffy Winter Coat - Red)
-    const coatMat = new THREE.MeshStandardMaterial({
-      color: 0xcc2222,
-      roughness: 0.6
-    });
-    const bodyGeo = new THREE.CylinderGeometry(0.42, 0.48, 0.8, 12);
-    const bodyMesh = new THREE.Mesh(bodyGeo, coatMat);
-    bodyMesh.position.y = 0.7;
-    bodyMesh.castShadow = true;
-    this.mesh.add(bodyMesh);
-
-    // Coat White Trim at bottom
-    const trimMat = new THREE.MeshStandardMaterial({ color: 0xf5f5f5, roughness: 0.8 });
-    const trimGeo = new THREE.TorusGeometry(0.46, 0.08, 6, 16);
-    trimGeo.rotateX(Math.PI / 2);
-    const trimMesh = new THREE.Mesh(trimGeo, trimMat);
-    trimMesh.position.y = 0.32;
-    this.mesh.add(trimMesh);
-
-    // Head
-    const headMat = new THREE.MeshStandardMaterial({
-      color: 0xffd2b3,
-      roughness: 0.6
-    });
-    const headGeo = new THREE.SphereGeometry(0.35, 12, 12);
-    const headMesh = new THREE.Mesh(headGeo, headMat);
-    headMesh.position.y = 1.3;
-    headMesh.castShadow = true;
-    this.mesh.add(headMesh);
-
-    // Cute Eyes
-    const eyeMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
-    const eyeGeo = new THREE.SphereGeometry(0.05, 6, 6);
-    const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
-    eyeL.position.set(-0.12, 1.34, 0.3);
-    this.mesh.add(eyeL);
-
-    const eyeR = eyeL.clone();
-    eyeR.position.x = 0.12;
-    this.mesh.add(eyeR);
-
-    // Green Scarf
-    const scarfMat = new THREE.MeshStandardMaterial({ color: 0x1e824c, roughness: 0.6 });
-    const scarfGeo = new THREE.TorusGeometry(0.33, 0.1, 8, 16);
-    scarfGeo.rotateX(Math.PI / 2);
-    const scarfMesh = new THREE.Mesh(scarfGeo, scarfMat);
-    scarfMesh.position.y = 1.05;
-    this.mesh.add(scarfMesh);
-
-    // Santa Hat
-    const hatGroup = new THREE.Group();
-    hatGroup.position.set(0, 1.52, 0);
-
-    const hatBandGeo = new THREE.TorusGeometry(0.32, 0.08, 6, 16);
-    hatBandGeo.rotateX(Math.PI / 2);
-    const hatBand = new THREE.Mesh(hatBandGeo, trimMat);
-    hatGroup.add(hatBand);
-
-    const hatConeGeo = new THREE.ConeGeometry(0.32, 0.65, 12);
-    hatConeGeo.translate(0, 0.3, -0.08);
-    hatConeGeo.rotateX(-0.25);
-    const hatCone = new THREE.Mesh(hatConeGeo, coatMat);
-    hatGroup.add(hatCone);
-
-    const pompomGeo = new THREE.SphereGeometry(0.12, 8, 8);
-    const pompom = new THREE.Mesh(pompomGeo, trimMat);
-    pompom.position.set(0, 0.62, -0.22);
-    hatGroup.add(pompom);
-
-    this.mesh.add(hatGroup);
-
-    // Boots
-    const bootMat = new THREE.MeshStandardMaterial({ color: 0x2b1e1a, roughness: 0.7 });
-    const bootGeo = new THREE.BoxGeometry(0.24, 0.22, 0.35);
-    const bootL = new THREE.Mesh(bootGeo, bootMat);
-    bootL.position.set(-0.22, 0.11, 0.05);
-    bootL.castShadow = true;
-    this.mesh.add(bootL);
-
-    const bootR = bootL.clone();
-    bootR.position.x = 0.22;
-    this.mesh.add(bootR);
-
-    this.scene.add(this.mesh);
-  }
-
-  // Visual drop shadow underneath player for precise 3D jump landing
   createShadow() {
     const THREE = this.THREE;
-    const shadowGeo = new THREE.CircleGeometry(0.55, 16);
+    const shadowGeo = new THREE.CircleGeometry(0.68, 24);
     shadowGeo.rotateX(-Math.PI / 2);
     const shadowMat = new THREE.MeshBasicMaterial({
-      color: 0x050d18,
+      color: 0x050b14,
       transparent: true,
-      opacity: 0.45,
+      opacity: 0.65,
       depthWrite: false
     });
     this.shadowMesh = new THREE.Mesh(shadowGeo, shadowMat);
@@ -144,48 +191,54 @@ class Player {
 
   reset(pos) {
     this.position.copy(pos);
+    this.checkpointPos.copy(pos);
     this.velocity.set(0, 0, 0);
     this.isGrounded = false;
-    this.groundPlatform = null;
-    this.coyoteTimer = 0;
-    this.jumpBufferTimer = 0;
+    this.isClimbing = false;
+    this.hp = 100;
+    this.stamina = 100;
+    this.cameraYaw = Math.PI;
+    this.mesh.rotation.y = 0;
   }
 
-  update(delta, stage) {
+  respawnAtCheckpoint() {
+    this.position.copy(this.checkpointPos).add(new this.THREE.Vector3(0, 1.2, 0));
+    this.velocity.set(0, 0, 0);
+    this.isGrounded = false;
+    this.isClimbing = false;
+    this.hp = Math.max(50, this.hp);
+  }
+
+  triggerJump() {
+    this.jumpBufferTimer = 0.16;
+  }
+
+  update(delta, stage, onCheckpointCallback) {
     const THREE = this.THREE;
 
-    // 1. Timers
+    if (this.invincibleTimer > 0) this.invincibleTimer -= delta;
+
     if (this.isGrounded) {
-      this.coyoteTimer = 0.14;
+      this.coyoteTimer = 0.15;
+      this.jumpsRemaining = 2;
     } else {
       this.coyoteTimer = Math.max(0, this.coyoteTimer - delta);
     }
     this.jumpBufferTimer = Math.max(0, this.jumpBufferTimer - delta);
 
-    // 2. Camera-relative movement direction
-    const camDirX = Math.sin(this.cameraYaw);
-    const camDirZ = Math.cos(this.cameraYaw);
-    const camRightX = Math.sin(this.cameraYaw + Math.PI / 2);
-    const camRightZ = Math.cos(this.cameraYaw + Math.PI / 2);
+    // Camera-relative directions
+    // Camera sits at +sin(yaw), +cos(yaw) from player, so forward is -sin(yaw), -cos(yaw)
+    const fwdX = -Math.sin(this.cameraYaw);
+    const fwdZ = -Math.cos(this.cameraYaw);
+    const rightX = -fwdZ;
+    const rightZ = fwdX;
 
     let moveX = 0;
     let moveZ = 0;
-    if (this.input.forward) {
-      moveX -= camDirX;
-      moveZ -= camDirZ;
-    }
-    if (this.input.backward) {
-      moveX += camDirX;
-      moveZ += camDirZ;
-    }
-    if (this.input.left) {
-      moveX -= camRightX;
-      moveZ -= camRightZ;
-    }
-    if (this.input.right) {
-      moveX += camRightX;
-      moveZ += camRightZ;
-    }
+    if (this.input.forward) { moveX += fwdX; moveZ += fwdZ; }
+    if (this.input.backward) { moveX -= fwdX; moveZ -= fwdZ; }
+    if (this.input.left) { moveX -= rightX; moveZ -= rightZ; }
+    if (this.input.right) { moveX += rightX; moveZ += rightZ; }
 
     const moveLen = Math.hypot(moveX, moveZ);
     if (moveLen > 0.001) {
@@ -193,145 +246,252 @@ class Player {
       moveZ /= moveLen;
     }
 
-    // 3. Acceleration & Friction
-    const maxSpeed = 10.5;
-    const accel = this.isGrounded ? (this.currentFriction < 0.1 ? 16 : 48) : 22;
-    const friction = this.isGrounded ? this.currentFriction : 0.98;
+    // Stamina & Dash calculation
+    const isDashing = this.input.dash && moveLen > 0.01 && this.stamina > 5;
+    if (isDashing) {
+      this.stamina = Math.max(0, this.stamina - 28 * delta);
+    } else {
+      this.stamina = Math.min(this.maxStamina, this.stamina + 22 * delta);
+    }
+
+    const maxSpeed = isDashing ? 9.6 : 6.0;
+    const accel = this.isGrounded ? 38 : 24;
 
     if (moveLen > 0.001) {
       this.velocity.x += moveX * accel * delta;
       this.velocity.z += moveZ * accel * delta;
 
-      // Rotate model towards movement direction
+      // Smoothly rotate character toward movement direction
       const targetAngle = Math.atan2(moveX, moveZ);
-      this.mesh.rotation.y = targetAngle;
+      let diff = targetAngle - this.mesh.rotation.y;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      this.mesh.rotation.y += diff * Math.min(1, delta * 14);
     } else if (this.isGrounded) {
-      // Natural braking
-      this.velocity.x *= Math.pow(friction, delta * 30);
-      this.velocity.z *= Math.pow(friction, delta * 30);
+      // Crisp, immediate stop when releasing keys
+      const stopFactor = this.currentFriction < 0.2 ? 0.92 : 0.02;
+      this.velocity.x *= Math.pow(stopFactor, delta * 35);
+      this.velocity.z *= Math.pow(stopFactor, delta * 35);
+      if (Math.hypot(this.velocity.x, this.velocity.z) < 0.08) {
+        this.velocity.x = 0;
+        this.velocity.z = 0;
+      }
+    } else {
+      this.velocity.x *= 0.97;
+      this.velocity.z *= 0.97;
     }
 
-    // Speed clamp on horizontal plane
+    // Clamp horizontal speed unless launched by a Snowflake Jump Pad
     const hSpeed = Math.hypot(this.velocity.x, this.velocity.z);
-    if (hSpeed > maxSpeed) {
+    if (hSpeed > maxSpeed && this.velocity.y < 14) {
       this.velocity.x = (this.velocity.x / hSpeed) * maxSpeed;
       this.velocity.z = (this.velocity.z / hSpeed) * maxSpeed;
     }
 
-    // 4. Jump physics
-    const gravity = 28.0;
-    const jumpSpeed = 12.5;
+    // Jump & Double Jump
+    const gravity = 25.0;
+    const jumpSpeed = 11.8;
 
-    if (this.jumpBufferTimer > 0 && this.coyoteTimer > 0) {
-      this.velocity.y = jumpSpeed;
-      this.isGrounded = false;
-      this.coyoteTimer = 0;
-      this.jumpBufferTimer = 0;
-      if (window.soundManager) window.soundManager.playJump();
-    }
-
-    // Apply gravity
-    this.velocity.y -= gravity * delta;
-
-    // Apply moving platform motion if standing on one
-    if (this.isGrounded && this.groundPlatform && this.groundPlatform.userData.type === GimmickType.MOVING_PLATFORM) {
-      const deltaPos = this.groundPlatform.userData.deltaPos;
-      if (deltaPos) {
-        this.position.add(deltaPos);
+    if (this.jumpBufferTimer > 0) {
+      if (this.coyoteTimer > 0 || this.isClimbing) {
+        this.velocity.y = jumpSpeed;
+        this.isGrounded = false;
+        this.isClimbing = false;
+        this.coyoteTimer = 0;
+        this.jumpBufferTimer = 0;
+        this.jumpsRemaining = 1;
+        if (window.soundManager) window.soundManager.playJump();
+      } else if (this.jumpsRemaining > 0) {
+        // Double Jump!
+        this.velocity.y = jumpSpeed * 0.92;
+        this.jumpsRemaining--;
+        this.jumpBufferTimer = 0;
+        if (window.soundManager) window.soundManager.playJump();
       }
     }
 
-    // Move player position
+    // Apply Gravity
+    if (!this.isClimbing) {
+      this.velocity.y -= gravity * delta;
+    }
+
+    // Ride Moving Platforms ("動く床")
+    if (this.isGrounded && this.groundPlatform && this.groundPlatform.userData.deltaPos) {
+      this.position.add(this.groundPlatform.userData.deltaPos);
+    }
+
+    // Integrate Position
     this.position.x += this.velocity.x * delta;
     this.position.y += this.velocity.y * delta;
     this.position.z += this.velocity.z * delta;
 
-    // 5. Collision with platforms
-    this.checkPlatformCollisions(stage);
+    // Platform & Climbing Collisions
+    this.checkCollisions(stage, delta);
 
-    // Update 3D visual position
-    this.mesh.position.copy(this.position);
-
-    // Update Drop Shadow
-    this.updateShadow(stage);
-
-    // Bobbing animation while moving
-    if (this.isGrounded && hSpeed > 0.5) {
-      this.mesh.position.y += Math.abs(Math.sin(Date.now() * 0.014)) * 0.12;
+    // Check Checkpoints
+    if (stage.checkpoints) {
+      stage.checkpoints.forEach(cp => {
+        if (!cp.gate.userData.activated) {
+          const d = this.position.distanceTo(cp.position);
+          if (d < 3.8) {
+            cp.gate.userData.activate();
+            this.checkpointPos.copy(cp.position);
+            this.hp = this.maxHp;
+            if (window.soundManager) window.soundManager.playBell();
+            if (onCheckpointCallback) onCheckpointCallback();
+          }
+        }
+      });
     }
+
+    // Update Articulated Character Limb Animation
+    this.updateLimbAnimation(delta, hSpeed, isDashing);
+
+    this.mesh.position.copy(this.position);
+    this.updateShadow(stage);
   }
 
-  checkPlatformCollisions(stage) {
+  checkCollisions(stage, delta) {
     const pX = this.position.x;
     const pY = this.position.y;
     const pZ = this.position.z;
     const r = this.radius;
 
     let landed = false;
-    let newFriction = 0.85;
+    let climbing = false;
+    let newFriction = 0.88;
 
     const platforms = stage.platforms;
     for (let i = 0; i < platforms.length; i++) {
       const plat = platforms[i];
       const b = plat.userData.bounds;
-      const bPos = plat.position;
+      if (!b) continue;
+      const pos = plat.position;
 
-      // Platform Box bounds
-      const minX = bPos.x - b.w / 2 - r;
-      const maxX = bPos.x + b.w / 2 + r;
-      const minZ = bPos.z - b.d / 2 - r;
-      const maxZ = bPos.z + b.d / 2 + r;
-      const topY = bPos.y + b.h / 2;
+      const minX = pos.x - b.w / 2 - r;
+      const maxX = pos.x + b.w / 2 + r;
+      const minZ = pos.z - b.d / 2 - r;
+      const maxZ = pos.z + b.d / 2 + r;
+      const topY = pos.y + b.h / 2;
+      const botY = pos.y - b.h / 2;
 
-      // Check horizontal overlap
       if (pX >= minX && pX <= maxX && pZ >= minZ && pZ <= maxZ) {
-        // Landing on top surface
-        const prevY = pY - this.velocity.y * 0.016; // approximate previous Y
-        if (pY <= topY + 0.15 && prevY >= topY - 0.4 && this.velocity.y <= 0) {
+        // 1. Check landing on top
+        const prevY = pY - this.velocity.y * delta;
+        if (pY <= topY + 0.25 && prevY >= topY - 0.55 && this.velocity.y <= 0) {
           this.position.y = topY;
           this.velocity.y = 0;
           landed = true;
           this.groundPlatform = plat;
-          newFriction = plat.userData.friction !== undefined ? plat.userData.friction : 0.85;
+          newFriction = plat.userData.friction !== undefined ? plat.userData.friction : 0.88;
 
-          // Special Gimmick Triggers
-          if (plat.userData.type === GimmickType.BOUNCE_PRESENT) {
-            // Trampoline present super bounce!
-            this.velocity.y = plat.userData.bounceForce || 24;
+          // Snowflake Super Jump Pad Launch!
+          if (plat.userData.type === GimmickType.SNOWFLAKE_PAD && plat.userData.bounceVelocity) {
+            const bv = plat.userData.bounceVelocity;
+            this.velocity.set(bv.x, bv.y, bv.z);
             landed = false;
             this.groundPlatform = null;
+            this.jumpsRemaining = 2;
             if (window.soundManager) window.soundManager.playBounce();
-          } else if (plat.userData.type === GimmickType.CRUMBLE) {
-            // Trigger crumble countdown
-            plat.userData.steppedOn = true;
           }
           break;
+        }
+
+        // 2. Check Climbing on Giant Presents (Net / Ladder on side faces!)
+        if (plat.userData.isClimbable && pY >= botY - 0.5 && pY < topY - 0.1) {
+          // Push player slightly outside box wall and climb up if moving or holding jump/climb
+          const wantClimb = this.input.forward || this.input.jump || this.input.climb;
+          if (wantClimb) {
+            climbing = true;
+            this.velocity.y = 6.8;
+            this.position.y += this.velocity.y * delta;
+            if (this.position.y >= topY - 0.15) {
+              this.position.y = topY + 0.1;
+              this.velocity.y = 4.0;
+              climbing = false;
+              landed = true;
+            }
+            break;
+          }
         }
       }
     }
 
+    // Valley Snow Floor safety collision at y = -5.5
+    if (!landed && !climbing && this.position.y <= -5.5) {
+      this.position.y = -5.5;
+      this.velocity.y = 0;
+      landed = true;
+      this.groundPlatform = null;
+    }
+
     if (landed && !this.isGrounded) {
-      // Just landed from air
       if (window.soundManager) window.soundManager.playLand();
     }
 
     this.isGrounded = landed;
+    this.isClimbing = climbing;
     this.currentFriction = newFriction;
     if (!landed) {
       this.groundPlatform = null;
     }
   }
 
+  updateLimbAnimation(delta, hSpeed, isDashing) {
+    const parts = this.mesh.userData;
+    if (!parts) return;
+
+    if (this.isClimbing) {
+      // Climbing net/ladder animation
+      this.animTime += delta * 14;
+      parts.leftArm.rotation.x = -Math.PI * 0.75 + Math.sin(this.animTime) * 0.45;
+      parts.rightArm.rotation.x = -Math.PI * 0.75 - Math.sin(this.animTime) * 0.45;
+      parts.leftLeg.rotation.x = Math.sin(this.animTime) * 0.45;
+      parts.rightLeg.rotation.x = -Math.sin(this.animTime) * 0.45;
+      parts.torsoGroup.rotation.x = -0.1;
+    } else if (!this.isGrounded) {
+      // Dynamic Mid-Air Parkour Pose (Matching the reference image!)
+      parts.leftArm.rotation.z = 0.85;
+      parts.rightArm.rotation.z = -0.85;
+      parts.leftArm.rotation.x = -0.35;
+      parts.rightArm.rotation.x = -0.35;
+      parts.leftLeg.rotation.x = -0.45;
+      parts.rightLeg.rotation.x = 0.35;
+      parts.torsoGroup.rotation.x = 0.12;
+    } else if (hSpeed > 0.35) {
+      // Running / Dashing cycle
+      const rate = isDashing ? 18 : 12;
+      this.animTime += delta * rate;
+      const swing = Math.sin(this.animTime) * (isDashing ? 0.85 : 0.62);
+
+      parts.leftArm.rotation.z = 0.12;
+      parts.rightArm.rotation.z = -0.12;
+      parts.leftArm.rotation.x = swing;
+      parts.rightArm.rotation.x = -swing;
+      parts.leftLeg.rotation.x = -swing;
+      parts.rightLeg.rotation.x = swing;
+      parts.torsoGroup.rotation.x = isDashing ? 0.22 : 0.08;
+    } else {
+      // Idle breathing
+      this.animTime += delta * 3;
+      parts.leftArm.rotation.set(0, 0, 0.1);
+      parts.rightArm.rotation.set(0, 0, -0.1);
+      parts.leftLeg.rotation.set(0, 0, 0);
+      parts.rightLeg.rotation.set(0, 0, 0);
+      parts.torsoGroup.rotation.x = 0;
+    }
+  }
+
   updateShadow(stage) {
-    // Cast shadow to the nearest platform below player
     const pX = this.position.x;
     const pY = this.position.y;
     const pZ = this.position.z;
 
-    let highestYBelow = -999;
+    let highestYBelow = -5.5;
     for (let i = 0; i < stage.platforms.length; i++) {
       const plat = stage.platforms[i];
       const b = plat.userData.bounds;
+      if (!b) continue;
       const pos = plat.position;
 
       if (
@@ -341,28 +501,22 @@ class Player {
         pZ <= pos.z + b.d / 2
       ) {
         const topY = pos.y + b.h / 2;
-        if (topY <= pY + 0.2 && topY > highestYBelow) {
+        if (topY <= pY + 0.3 && topY > highestYBelow) {
           highestYBelow = topY;
         }
       }
     }
 
-    if (highestYBelow > -900) {
-      this.shadowMesh.visible = true;
-      this.shadowMesh.position.set(pX, highestYBelow + 0.02, pZ);
-      const heightAbove = Math.max(0, pY - highestYBelow);
-      const scale = Math.max(0.2, 1.0 - heightAbove * 0.06);
-      this.shadowMesh.scale.set(scale, scale, scale);
-      this.shadowMesh.material.opacity = Math.max(0.1, 0.5 - heightAbove * 0.03);
-    } else {
-      this.shadowMesh.visible = false;
-    }
+    this.shadowMesh.visible = true;
+    this.shadowMesh.position.set(pX, highestYBelow + 0.03, pZ);
+    const heightAbove = Math.max(0, pY - highestYBelow);
+    const scale = Math.max(0.3, 1.0 - heightAbove * 0.04);
+    this.shadowMesh.scale.set(scale, scale, scale);
+    this.shadowMesh.material.opacity = Math.max(0.2, 0.68 - heightAbove * 0.025);
   }
 
-  // Camera follow update
   updateCamera(camera) {
-    const target = this.position.clone().add(new THREE.Vector3(0, 1.2, 0));
-
+    const target = this.position.clone().add(new this.THREE.Vector3(0, 1.45, 0));
     const hDist = this.cameraDistance * Math.cos(this.cameraPitch);
     const vDist = this.cameraDistance * Math.sin(this.cameraPitch);
 
@@ -375,4 +529,85 @@ class Player {
   }
 }
 
+// AI Challenger Runners (Creates the exciting 30-Player Athletic Race feel!)
+class AIChallenger {
+  constructor(THREE, scene, waypoints, index) {
+    this.THREE = THREE;
+    this.scene = scene;
+    this.waypoints = waypoints;
+    this.wpIndex = 1;
+
+    const palettes = [
+      [0xff5252, 0xffd740, 0x69f0ae, 0x448aff],
+      [0xe040fb, 0x00e5ff, 0xffab40, 0x7c4dff],
+      [0x00e676, 0xffea00, 0xff1744, 0x2979ff]
+    ];
+    this.mesh = createWinterCharacterMesh(THREE, palettes[index % palettes.length]);
+    this.mesh.scale.setScalar(0.88);
+
+    const start = waypoints[0] || new THREE.Vector3(0, 1, 0);
+    this.offsetX = ((index % 5) - 2) * 1.4;
+    this.position = new THREE.Vector3(start.x + this.offsetX, start.y, start.z + (index * 1.6));
+    this.speed = 4.2 + (index % 5) * 0.45;
+    this.animPhase = index * 1.3;
+    this.finished = false;
+
+    this.mesh.position.copy(this.position);
+    this.scene.add(this.mesh);
+  }
+
+  update(delta) {
+    if (this.finished || !this.waypoints || this.waypoints.length < 2) return;
+
+    const target = this.waypoints[this.wpIndex];
+    if (!target) {
+      this.finished = true;
+      return;
+    }
+
+    const tx = target.x + this.offsetX * 0.5;
+    const ty = target.y;
+    const tz = target.z;
+
+    const dx = tx - this.position.x;
+    const dy = ty - this.position.y;
+    const dz = tz - this.position.z;
+    const dist = Math.hypot(dx, dz);
+
+    if (dist < 1.5) {
+      this.wpIndex++;
+      if (this.wpIndex >= this.waypoints.length) {
+        this.finished = true;
+      }
+      return;
+    }
+
+    const vx = (dx / dist) * this.speed;
+    const vz = (dz / dist) * this.speed;
+    this.position.x += vx * delta;
+    this.position.z += vz * delta;
+    this.position.y += dy * Math.min(1, delta * 4.5);
+
+    // Hop animation
+    this.animPhase += delta * 11;
+    const hop = Math.abs(Math.sin(this.animPhase)) * 0.35;
+    this.mesh.position.set(this.position.x, this.position.y + hop, this.position.z);
+    this.mesh.rotation.y = Math.atan2(vx, vz);
+
+    const parts = this.mesh.userData;
+    if (parts) {
+      const s = Math.sin(this.animPhase) * 0.6;
+      parts.leftArm.rotation.x = s;
+      parts.rightArm.rotation.x = -s;
+      parts.leftLeg.rotation.x = -s;
+      parts.rightLeg.rotation.x = s;
+    }
+  }
+
+  dispose() {
+    this.scene.remove(this.mesh);
+  }
+}
+
 window.Player = Player;
+window.AIChallenger = AIChallenger;

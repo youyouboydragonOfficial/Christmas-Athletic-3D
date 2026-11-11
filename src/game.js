@@ -1,17 +1,18 @@
-// game.js - Master Game Controller: Scene, Lights, Snow Weather, Game Loop, UI Interaction
+// game.js - Master Controller for Christmas Athletic 3D (Matching Reference Image Scene, HUD & 30-Player Race)
 
 class Game {
   constructor() {
     this.currentStageNum = 1;
     this.maxStages = 1000;
     this.timeElapsed = 0;
-    this.bellsCollected = 0;
-    this.totalBellsInStage = 0;
+    this.snowflakesCollected = 12; // Starts at 12 like "❄️ × 12" in the reference image, increments as you collect!
     this.isCleared = false;
-    this.isPaused = false;
+    this.showGuideLabels = true;
     this.isDraggingMouse = false;
     this.lastMouseX = 0;
     this.lastMouseY = 0;
+    this.aiChallengers = [];
+    this.labelElements = [];
 
     this.initThree();
     this.initSnowParticles();
@@ -19,6 +20,7 @@ class Game {
     this.bindEvents();
 
     this.loadStage(this.currentStageNum);
+    this.lastFrameTime = performance.now();
     this.animate = this.animate.bind(this);
     requestAnimationFrame(this.animate);
   }
@@ -28,15 +30,12 @@ class Game {
     const width = window.innerWidth;
     const height = window.innerHeight;
 
-    // Scene
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x0e1726);
-    this.scene.fog = new THREE.FogExp2(0x132238, 0.012);
+    this.scene.background = new THREE.Color(0x232952);
+    this.scene.fog = new THREE.FogExp2(0x3b3d68, 0.0065);
 
-    // Camera
-    this.camera = new THREE.PerspectiveCamera(55, width / height, 0.1, 1000);
+    this.camera = new THREE.PerspectiveCamera(56, width / height, 0.1, 800);
 
-    // Renderer
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     this.renderer.setSize(width, height);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -44,45 +43,39 @@ class Game {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.container.appendChild(this.renderer.domElement);
 
-    // Lights
-    this.ambientLight = new THREE.AmbientLight(0xddeeff, 0.55);
-    this.scene.add(this.ambientLight);
+    // Rich Twilight + Warm Festive Lighting
+    this.hemiLight = new THREE.HemisphereLight(0xb8d0ff, 0x4a3b5c, 0.85);
+    this.scene.add(this.hemiLight);
 
-    this.sunLight = new THREE.DirectionalLight(0xfff8ee, 1.25);
-    this.sunLight.position.set(40, 80, 50);
+    this.sunLight = new THREE.DirectionalLight(0xffe8cc, 1.35);
+    this.sunLight.position.set(-45, 75, -30);
     this.sunLight.castShadow = true;
     this.sunLight.shadow.mapSize.width = 2048;
     this.sunLight.shadow.mapSize.height = 2048;
     this.sunLight.shadow.camera.near = 10;
-    this.sunLight.shadow.camera.far = 250;
-    const shadowD = 60;
-    this.sunLight.shadow.camera.left = -shadowD;
-    this.sunLight.shadow.camera.right = shadowD;
-    this.sunLight.shadow.camera.top = shadowD;
-    this.sunLight.shadow.camera.bottom = -shadowD;
+    this.sunLight.shadow.camera.far = 260;
+    const d = 75;
+    this.sunLight.shadow.camera.left = -d;
+    this.sunLight.shadow.camera.right = d;
+    this.sunLight.shadow.camera.top = d;
+    this.sunLight.shadow.camera.bottom = -d;
     this.scene.add(this.sunLight);
-
-    // Subtle blue moon/sky rim light
-    this.rimLight = new THREE.DirectionalLight(0x5599ee, 0.4);
-    this.rimLight.position.set(-40, 30, -50);
-    this.scene.add(this.rimLight);
   }
 
-  // Beautiful Falling Snowflakes Particle System
   initSnowParticles() {
-    const snowCount = 2500;
+    const snowCount = 2600;
     const snowGeo = new THREE.BufferGeometry();
     const positions = new Float32Array(snowCount * 3);
     const velocities = new Float32Array(snowCount * 3);
 
     for (let i = 0; i < snowCount; i++) {
-      positions[i * 3 + 0] = (Math.random() - 0.5) * 160;
-      positions[i * 3 + 1] = Math.random() * 80;
-      positions[i * 3 + 2] = (Math.random() - 0.5) * 160;
+      positions[i * 3 + 0] = (Math.random() - 0.5) * 180;
+      positions[i * 3 + 1] = Math.random() * 75;
+      positions[i * 3 + 2] = (Math.random() - 0.5) * 180;
 
-      velocities[i * 3 + 0] = (Math.random() - 0.5) * 0.4;
-      velocities[i * 3 + 1] = -(1.2 + Math.random() * 2.2);
-      velocities[i * 3 + 2] = (Math.random() - 0.5) * 0.4;
+      velocities[i * 3 + 0] = (Math.random() - 0.5) * 0.5;
+      velocities[i * 3 + 1] = -(1.5 + Math.random() * 2.2);
+      velocities[i * 3 + 2] = (Math.random() - 0.5) * 0.5;
     }
 
     snowGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
@@ -90,7 +83,7 @@ class Game {
 
     const snowMat = new THREE.PointsMaterial({
       color: 0xffffff,
-      size: 0.35,
+      size: 0.38,
       transparent: true,
       opacity: 0.85,
       blending: THREE.AdditiveBlending
@@ -110,62 +103,167 @@ class Game {
     this.currentStageNum = Math.max(1, Math.min(this.maxStages, stageNum));
     this.isCleared = false;
     this.timeElapsed = 0;
-    this.bellsCollected = 0;
 
-    // Clear old stage group
     if (this.currentStageGroup) {
       this.scene.remove(this.currentStageGroup);
     }
 
-    // Build new stage
+    // Clear old AI challengers
+    this.aiChallengers.forEach(ai => ai.dispose());
+    this.aiChallengers = [];
+
+    // Build stage
     this.stageData = this.stageGenerator.buildStage(this.currentStageNum);
     this.currentStageGroup = this.stageData.stageGroup;
     this.scene.add(this.currentStageGroup);
 
-    this.totalBellsInStage = this.stageData.collectibleBells.length;
+    // Apply Theme Sky & Fog
+    const theme = this.stageData.info.theme;
+    this.scene.background.setHex(theme.skyTop);
+    this.scene.fog.color.setHex(theme.fog);
+    this.sunLight.color.setHex(theme.light);
 
-    // Apply Biome Atmosphere
-    const biome = this.stageData.info.biome;
-    this.scene.background.setHex(biome.sky);
-    this.scene.fog.color.setHex(biome.fog);
-    this.sunLight.color.setHex(biome.light);
-
-    // Reset player
+    // Reset Player
     this.player.reset(this.stageData.startPosition);
 
-    // Update HUD
-    this.updateHUD();
-    this.hideClearModal();
+    // Spawn AI Challengers along the course (for the 30-player athletic race feel!)
+    for (let i = 0; i < 12; i++) {
+      const ai = new AIChallenger(THREE, this.scene, this.stageData.aiWaypoints, i);
+      this.aiChallengers.push(ai);
+    }
 
-    // Start BGM on user start
-    if (window.soundManager) {
-      window.soundManager.playBGM();
+    // Build 3D Floating Guide Labels ("雪の足場", "巨大なプレゼント", "動く床")
+    this.createGuideLabelDOM();
+
+    this.setBannerText('REACH THE GOAL!');
+    this.hideClearModal();
+    this.updateHUD();
+  }
+
+  createGuideLabelDOM() {
+    const container = document.getElementById('world-labels-container');
+    container.innerHTML = '';
+    this.labelElements = [];
+
+    if (!this.stageData.guideLabels) return;
+    this.stageData.guideLabels.forEach(lbl => {
+      const el = document.createElement('div');
+      el.className = 'world-floating-label';
+      el.innerText = lbl.text;
+      container.appendChild(el);
+      this.labelElements.push({ el, worldPos: lbl.position });
+    });
+  }
+
+  updateGuideLabels() {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+
+    this.labelElements.forEach(item => {
+      if (!this.showGuideLabels) {
+        item.el.style.display = 'none';
+        return;
+      }
+
+      const proj = item.worldPos.clone().project(this.camera);
+      const dist = this.camera.position.distanceTo(item.worldPos);
+
+      if (proj.z > 1.0 || proj.z < -1.0 || dist > 65) {
+        item.el.style.display = 'none';
+      } else {
+        const sx = (proj.x * 0.5 + 0.5) * w;
+        const sy = (-proj.y * 0.5 + 0.5) * h;
+        item.el.style.display = 'block';
+        item.el.style.left = `${sx}px`;
+        item.el.style.top = `${sy}px`;
+      }
+    });
+  }
+
+  setBannerText(txt, revertAfterMs = 0) {
+    const banner = document.getElementById('center-banner-text');
+    if (banner) {
+      banner.innerText = txt;
+    }
+    if (revertAfterMs > 0) {
+      clearTimeout(this.bannerTimeout);
+      this.bannerTimeout = setTimeout(() => {
+        if (!this.isCleared && banner) {
+          banner.innerText = 'REACH THE GOAL!';
+        }
+      }, revertAfterMs);
     }
   }
 
+  formatTimer(sec) {
+    const mins = Math.floor(sec / 60);
+    const secs = Math.floor(sec % 60);
+    const cs = Math.floor((sec % 1) * 100);
+    const mm = String(mins).padStart(2, '0');
+    const ss = String(secs).padStart(2, '0');
+    const cc = String(cs).padStart(2, '0');
+    return `${mm}:${ss}.${cc}`;
+  }
+
   updateHUD() {
-    const info = this.stageData.info;
-    document.getElementById('hud-stage-title').innerText = info.title;
-    document.getElementById('hud-gimmick').innerText = info.featuredGimmicks;
-    document.getElementById('hud-bells').innerText = `${this.bellsCollected} / ${this.totalBellsInStage}`;
-    document.getElementById('hud-timer').innerText = this.timeElapsed.toFixed(1) + 's';
+    // Top Header Bar
+    const stageEl = document.getElementById('hud-stage-name');
+    if (stageEl) {
+      stageEl.innerText = this.currentStageNum === 1
+        ? 'STAGE: CHRISTMAS ATHLETIC'
+        : `STAGE ${this.currentStageNum}: CHRISTMAS ATHLETIC`;
+    }
+
+    const timerEl = document.getElementById('hud-timer');
+    if (timerEl) {
+      timerEl.innerText = `TIMER: ${this.formatTimer(this.timeElapsed)}`;
+    }
+
+    // Active qualifiers count (starts 18/30 like the reference screenshot)
+    const activeCount = 18;
+    const playersEl = document.getElementById('hud-players');
+    if (playersEl) {
+      playersEl.innerText = `PLAYERS: ${activeCount}/30`;
+    }
+
+    // HP & Stamina Bars
+    const hpFill = document.getElementById('hp-bar-fill');
+    if (hpFill) {
+      hpFill.style.width = `${Math.max(0, Math.min(100, this.player.hp))}%`;
+    }
+    const stamFill = document.getElementById('stamina-bar-fill');
+    if (stamFill) {
+      stamFill.style.width = `${Math.max(0, Math.min(100, this.player.stamina))}%`;
+    }
+
+    // Snowflake Counter
+    const snowCountEl = document.getElementById('hud-snowflake-count');
+    if (snowCountEl) {
+      snowCountEl.innerText = `×${this.snowflakesCollected}`;
+    }
   }
 
   showClearModal() {
     this.isCleared = true;
+    this.setBannerText('🏆 STAGE CLEAR! 🏆');
     if (window.soundManager) {
       window.soundManager.playClear();
     }
     const modal = document.getElementById('clear-modal');
     document.getElementById('clear-stage-num').innerText = this.currentStageNum;
-    document.getElementById('clear-time').innerText = this.timeElapsed.toFixed(2) + 's';
-    document.getElementById('clear-bells').innerText = `${this.bellsCollected} / ${this.totalBellsInStage}`;
+    document.getElementById('clear-time').innerText = this.formatTimer(this.timeElapsed);
+    document.getElementById('clear-bells').innerText = `❄️ ×${this.snowflakesCollected}`;
     modal.classList.remove('hidden');
+
+    if (this.autoNextTimer) clearTimeout(this.autoNextTimer);
+    this.autoNextTimer = setTimeout(() => {
+      this.loadStage(this.currentStageNum + 1);
+    }, 2000);
   }
 
   hideClearModal() {
     const modal = document.getElementById('clear-modal');
-    modal.classList.add('hidden');
+    if (modal) modal.classList.add('hidden');
   }
 
   bindEvents() {
@@ -177,9 +275,7 @@ class Game {
       this.renderer.setSize(w, h);
     });
 
-    // Keyboard controls
     window.addEventListener('keydown', (e) => {
-      // Audio start on first keypress
       if (window.soundManager && !window.soundManager.initialized) {
         window.soundManager.playBGM();
       }
@@ -188,26 +284,39 @@ class Game {
       if (e.code === 'KeyS' || e.code === 'ArrowDown') this.player.input.backward = true;
       if (e.code === 'KeyA' || e.code === 'ArrowLeft') this.player.input.left = true;
       if (e.code === 'KeyD' || e.code === 'ArrowRight') this.player.input.right = true;
+
       if (e.code === 'Space') {
         this.player.input.jump = true;
-        this.player.jumpBufferTimer = 0.16; // Jump buffering
+        this.player.triggerJump();
+      }
+      if (e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'KeyB') {
+        this.player.input.dash = true;
+      }
+      if (e.code === 'KeyC' || e.code === 'KeyE') {
+        this.player.input.climb = true;
+        this.player.input.dash = true;
+      }
+      if (e.code === 'KeyQ') {
+        this.player.cameraYaw += 0.08;
       }
       if (e.code === 'KeyR') {
-        // Quick Retry
-        this.player.reset(this.stageData.startPosition);
+        this.player.respawnAtCheckpoint();
+        this.setBannerText('RESPAWNED AT CHECKPOINT!', 1800);
+      }
+      if (e.code === 'KeyG') {
+        this.showGuideLabels = !this.showGuideLabels;
       }
       if (e.code === 'KeyM') {
-        // Toggle Mute
         const isMuted = !window.soundManager.isMuted;
         window.soundManager.setMuted(isMuted);
-        document.getElementById('btn-mute').innerText = isMuted ? '🔇 BGM OFF' : '🎵 BGM ON';
       }
       if (e.code === 'KeyT') {
-        // Switch BGM Track
-        const nextTrack = window.soundManager.currentTrack === 'upbeat' ? 'calm' : 'upbeat';
-        window.soundManager.switchTrack(nextTrack);
+        const tracks = ['fast', 'user_fast', 'calm'];
+        const nextIdx = (tracks.indexOf(window.soundManager.currentTrack) + 1) % tracks.length;
+        window.soundManager.switchTrack(tracks[nextIdx]);
       }
-      if (e.code === 'Escape') {
+      if (e.code === 'Escape' || e.code === 'Tab') {
+        e.preventDefault();
         this.toggleStageSelectModal();
       }
     });
@@ -218,9 +327,15 @@ class Game {
       if (e.code === 'KeyA' || e.code === 'ArrowLeft') this.player.input.left = false;
       if (e.code === 'KeyD' || e.code === 'ArrowRight') this.player.input.right = false;
       if (e.code === 'Space') this.player.input.jump = false;
+      if (e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'KeyB') {
+        this.player.input.dash = false;
+      }
+      if (e.code === 'KeyC' || e.code === 'KeyE') {
+        this.player.input.climb = false;
+        this.player.input.dash = false;
+      }
     });
 
-    // Mouse drag for camera orbit
     window.addEventListener('mousedown', (e) => {
       if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT') {
         this.isDraggingMouse = true;
@@ -234,7 +349,7 @@ class Game {
         const dx = e.clientX - this.lastMouseX;
         const dy = e.clientY - this.lastMouseY;
         this.player.cameraYaw -= dx * 0.0055;
-        this.player.cameraPitch = Math.max(0.08, Math.min(1.2, this.player.cameraPitch + dy * 0.004));
+        this.player.cameraPitch = Math.max(0.08, Math.min(1.15, this.player.cameraPitch + dy * 0.004));
         this.lastMouseX = e.clientX;
         this.lastMouseY = e.clientY;
       }
@@ -245,41 +360,42 @@ class Game {
     });
 
     window.addEventListener('wheel', (e) => {
-      this.player.cameraDistance = Math.max(3.5, Math.min(16.0, this.player.cameraDistance + e.deltaY * 0.006));
+      this.player.cameraDistance = Math.max(4.0, Math.min(16.0, this.player.cameraDistance + e.deltaY * 0.006));
     });
 
-    // UI Buttons
-    document.getElementById('btn-next-stage').addEventListener('click', () => {
-      this.loadStage(this.currentStageNum + 1);
-    });
-    document.getElementById('btn-retry').addEventListener('click', () => {
-      this.loadStage(this.currentStageNum);
-    });
-    document.getElementById('btn-select-stage').addEventListener('click', () => {
-      this.toggleStageSelectModal();
-    });
-    document.getElementById('btn-close-select').addEventListener('click', () => {
-      this.toggleStageSelectModal();
-    });
-    document.getElementById('btn-jump-stage').addEventListener('click', () => {
-      const inputVal = parseInt(document.getElementById('input-stage-num').value, 10);
-      if (!isNaN(inputVal) && inputVal >= 1 && inputVal <= 1000) {
-        this.loadStage(inputVal);
+    // Buttons
+    const btnNext = document.getElementById('btn-next-stage');
+    if (btnNext) {
+      btnNext.addEventListener('click', () => {
+        if (this.autoNextTimer) clearTimeout(this.autoNextTimer);
+        this.loadStage(this.currentStageNum + 1);
+      });
+    }
+
+    const btnGuide = document.getElementById('btn-open-guide');
+    if (btnGuide) {
+      btnGuide.addEventListener('click', () => {
         this.toggleStageSelectModal();
-      }
-    });
+      });
+    }
 
-    document.getElementById('btn-mute').addEventListener('click', () => {
-      const isMuted = !window.soundManager.isMuted;
-      window.soundManager.setMuted(isMuted);
-      document.getElementById('btn-mute').innerText = isMuted ? '🔇 BGM OFF' : '🎵 BGM ON';
-    });
+    const btnCloseSelect = document.getElementById('btn-close-select');
+    if (btnCloseSelect) {
+      btnCloseSelect.addEventListener('click', () => {
+        this.toggleStageSelectModal();
+      });
+    }
 
-    document.getElementById('btn-track').addEventListener('click', () => {
-      const nextTrack = window.soundManager.currentTrack === 'upbeat' ? 'calm' : 'upbeat';
-      window.soundManager.switchTrack(nextTrack);
-      document.getElementById('btn-track').innerText = nextTrack === 'upbeat' ? '🎷 Upbeat Band' : '🔔 Gentle Jingle';
-    });
+    const btnJumpStage = document.getElementById('btn-jump-stage');
+    if (btnJumpStage) {
+      btnJumpStage.addEventListener('click', () => {
+        const inputVal = parseInt(document.getElementById('input-stage-num').value, 10);
+        if (!isNaN(inputVal) && inputVal >= 1 && inputVal <= 1000) {
+          this.loadStage(inputVal);
+          this.toggleStageSelectModal();
+        }
+      });
+    }
   }
 
   toggleStageSelectModal() {
@@ -293,12 +409,11 @@ class Game {
   populateStageGrid() {
     const grid = document.getElementById('stage-grid');
     grid.innerHTML = '';
-    // Show quick stage jump presets (1, 10, 50, 100, 200, 500, 1000, etc.)
-    const milestones = [1, 2, 5, 10, 25, 50, 100, 200, 350, 500, 750, 1000];
+    const milestones = [1, 2, 3, 5, 10, 25, 50, 100, 250, 500, 750, 1000];
     milestones.forEach(s => {
       const btn = document.createElement('button');
       btn.className = 'stage-btn' + (s === this.currentStageNum ? ' active' : '');
-      btn.innerText = `Stage ${s}`;
+      btn.innerText = `STAGE ${s}`;
       btn.addEventListener('click', () => {
         this.loadStage(s);
         this.toggleStageSelectModal();
@@ -307,9 +422,8 @@ class Game {
     });
   }
 
-  // Update dynamic gimmicks
   updateGimmicks(delta, time) {
-    // 1. Moving Platforms
+    // 1. Moving Candy Cane Platforms ("動く床")
     this.stageData.movingObjects.forEach(plat => {
       const u = plat.userData;
       u.phase += delta * u.speed;
@@ -329,91 +443,55 @@ class Game {
       );
     });
 
-    // 2. Crumble Platforms
+    // 2. Rotate Snowflake Pads gently
     this.stageData.platforms.forEach(plat => {
-      if (plat.userData.type === GimmickType.CRUMBLE) {
-        const u = plat.userData;
-        if (u.steppedOn && !u.fallen) {
-          u.shakeTimer += delta;
-          // Shake vibration
-          plat.position.x += (Math.random() - 0.5) * 0.08;
-          plat.position.z += (Math.random() - 0.5) * 0.08;
-          if (u.shakeTimer >= u.shakeDuration) {
-            u.fallen = true;
-          }
-        } else if (u.fallen) {
-          u.fallSpeed += 30 * delta;
-          plat.position.y -= u.fallSpeed * delta;
-          u.respawnTimer += delta;
-          if (u.respawnTimer >= u.respawnDuration) {
-            // Respawn
-            u.steppedOn = false;
-            u.fallen = false;
-            u.fallSpeed = 0;
-            u.shakeTimer = 0;
-            u.respawnTimer = 0;
-            plat.position.y = u.originalY;
-          }
+      if (plat.userData.type === GimmickType.SNOWFLAKE_PAD && plat.userData.flakeGroup) {
+        plat.userData.flakeGroup.rotation.y += 0.45 * delta;
+      }
+    });
+
+    // 3. Spinning Candy Hazards
+    this.stageData.hazardObjects.forEach(haz => {
+      haz.rotation.y += haz.userData.speed * delta;
+      const d = this.player.position.distanceTo(haz.position);
+      if (d < haz.userData.length * 0.45 && Math.abs(this.player.position.y - haz.position.y) < 1.2) {
+        if (this.player.invincibleTimer <= 0) {
+          this.player.hp = Math.max(10, this.player.hp - 20);
+          this.player.velocity.y = 8.5;
+          this.player.invincibleTimer = 1.0;
+          if (window.soundManager) window.soundManager.playFall();
         }
       }
     });
 
-    // 3. Rotating Hazards
-    this.stageData.hazardObjects.forEach(hazard => {
-      if (hazard.userData.type === GimmickType.ROTATING_BEAM) {
-        hazard.rotation.y += hazard.userData.rotSpeed * delta;
-      } else if (hazard.userData.type === GimmickType.FALLING_ICICLE) {
-        const u = hazard.userData;
-        const pPos = this.player.position;
-        const distXZ = Math.hypot(pPos.x - hazard.position.x, pPos.z - hazard.position.z);
+    // 4. Collectible Coins & Snowflakes
+    this.stageData.collectibles.forEach(item => {
+      if (!item.userData.collected) {
+        item.rotation.y += 2.6 * delta;
+        item.position.y = item.userData.baseY + Math.sin(time * 4.0 + item.position.x) * 0.22;
 
-        if (!u.triggered && distXZ < u.triggerDistance && pPos.y < hazard.position.y) {
-          u.triggered = true;
-        }
-
-        if (u.triggered && !u.falling) {
-          u.shakeTimer += delta;
-          hazard.position.x += (Math.random() - 0.5) * 0.06;
-          if (u.shakeTimer >= u.shakeDuration) {
-            u.falling = true;
-          }
-        } else if (u.falling) {
-          u.fallVelocity += 40 * delta;
-          hazard.position.y -= u.fallVelocity * delta;
-          // Check collision with player
-          if (distXZ < 0.8 && Math.abs(pPos.y - hazard.position.y) < 1.5) {
-            if (window.soundManager) window.soundManager.playFall();
-            this.player.reset(this.stageData.startPosition);
-          }
-        }
-      }
-    });
-
-    // 4. Collectible Bells
-    this.stageData.collectibleBells.forEach(bell => {
-      if (!bell.userData.collected) {
-        bell.rotation.y += 2.4 * delta;
-        bell.position.y = bell.userData.baseY + Math.sin(time * 3.5) * 0.25;
-
-        // Player collection distance check
-        const d = this.player.position.distanceTo(bell.position);
-        if (d < 1.4) {
-          bell.userData.collected = true;
-          bell.visible = false;
-          this.bellsCollected++;
+        if (this.player.position.distanceTo(item.position) < 1.65) {
+          item.userData.collected = true;
+          item.visible = false;
+          this.snowflakesCollected++;
+          this.player.stamina = Math.min(100, this.player.stamina + 15);
           if (window.soundManager) window.soundManager.playBell();
-          this.updateHUD();
         }
       }
     });
 
-    // 5. Update Goal Tree
+    // 5. Update Goal Archway & Grand Christmas Tree Lights
+    if (this.stageData.goalArch && this.stageData.goalArch.userData.update) {
+      this.stageData.goalArch.userData.update(delta, time);
+    }
     if (this.stageData.goalTree && this.stageData.goalTree.userData.update) {
       this.stageData.goalTree.userData.update(delta, time);
     }
+
+    // 6. Update AI Challengers
+    this.aiChallengers.forEach(ai => ai.update(delta));
   }
 
-  // Update Snow particles around player
   updateSnow(delta) {
     if (!this.snowParticles) return;
     const pos = this.snowParticles.geometry.attributes.position.array;
@@ -425,56 +503,50 @@ class Game {
       pos[i * 3 + 1] += vel[i * 3 + 1];
       pos[i * 3 + 2] += vel[i * 3 + 2];
 
-      // Respawn near player in bounding cylinder
-      if (pos[i * 3 + 1] < pPos.y - 10) {
-        pos[i * 3 + 1] = pPos.y + 40 + Math.random() * 20;
-        pos[i * 3 + 0] = pPos.x + (Math.random() - 0.5) * 120;
-        pos[i * 3 + 2] = pPos.z + (Math.random() - 0.5) * 120;
+      if (pos[i * 3 + 1] < pPos.y - 12) {
+        pos[i * 3 + 1] = pPos.y + 42 + Math.random() * 18;
+        pos[i * 3 + 0] = pPos.x + (Math.random() - 0.5) * 140;
+        pos[i * 3 + 2] = pPos.z + (Math.random() - 0.5) * 140;
       }
     }
     this.snowParticles.geometry.attributes.position.needsUpdate = true;
   }
 
-  animate(currentTime) {
+  animate(now) {
     requestAnimationFrame(this.animate);
 
-    const delta = 0.016; // Stable ~60fps step
-    const time = currentTime * 0.001;
+    const rawDelta = (now - this.lastFrameTime) * 0.001;
+    this.lastFrameTime = now;
+    const delta = Math.min(0.033, Math.max(0.001, rawDelta || 0.016));
+    const time = now * 0.001;
 
     if (!this.isCleared) {
       this.timeElapsed += delta;
-      this.updateHUD();
     }
 
-    // 1. Update Gimmicks & Environment
     this.updateGimmicks(delta, time);
 
-    // 2. Update Player
-    this.player.update(delta, this.stageData);
+    this.player.update(delta, this.stageData, () => {
+      this.setBannerText('✨ CHECKPOINT REACHED! ✨', 2200);
+    });
 
-    // 3. Fall death check
-    if (this.player.position.y < -18) {
-      if (window.soundManager) window.soundManager.playFall();
-      this.player.reset(this.stageData.startPosition);
-    }
-
-    // 4. Goal Check (Touching top star of realistic tree)
+    // Goal Check (Reaching the Hilltop GOAL! Archway or Christmas Tree)
     if (!this.isCleared) {
       const distToGoal = this.player.position.distanceTo(this.stageData.goalPosition);
-      if (distToGoal < 4.2) {
+      if (distToGoal < 7.5) {
         this.showClearModal();
       }
     }
 
-    // 5. Camera & Snow
     this.player.updateCamera(this.camera);
     this.updateSnow(delta);
+    this.updateGuideLabels();
+    this.updateHUD();
 
-    // 6. Follow light
     this.sunLight.position.set(
-      this.player.position.x + 40,
-      this.player.position.y + 80,
-      this.player.position.z + 50
+      this.player.position.x - 35,
+      this.player.position.y + 70,
+      this.player.position.z - 25
     );
     this.sunLight.target.position.copy(this.player.position);
     this.sunLight.target.updateMatrixWorld();
