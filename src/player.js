@@ -1,4 +1,4 @@
-// player.js - Articulated Winter Parkour Character (Rainbow Puffer Jacket) + Climbing, Dash, Stamina/HP & AI Challengers
+// player.js - Articulated Winter Parkour Character (Rainbow Puffer Jacket) + Climbing, Dash, Stamina/HP & Instant Fall Death
 
 function createWinterCharacterMesh(THREE, palette = null) {
   const root = new THREE.Group();
@@ -139,14 +139,16 @@ class Player {
 
     this.isGrounded = false;
     this.isClimbing = false;
+    this.isDead = false;
+    this.deathRespawnTimer = 0;
     this.groundPlatform = null;
     this.currentFriction = 0.88;
 
     this.coyoteTimer = 0;
     this.jumpBufferTimer = 0;
-    this.jumpsRemaining = 2; // Supports Double Jump!
+    this.jumpsRemaining = 2;
 
-    // HP & Stamina (Matching top-left HUD in the image!)
+    // HP & Stamina
     this.hp = 100;
     this.maxHp = 100;
     this.stamina = 100;
@@ -166,7 +168,7 @@ class Player {
     };
 
     // Camera Orbit (Behind Player looking down the course toward the GOAL!)
-    this.cameraYaw = Math.PI; // Facing +Z toward the course
+    this.cameraYaw = Math.PI;
     this.cameraPitch = 0.26;
     this.cameraDistance = 8.2;
 
@@ -195,10 +197,12 @@ class Player {
     this.velocity.set(0, 0, 0);
     this.isGrounded = false;
     this.isClimbing = false;
+    this.isDead = false;
+    this.deathRespawnTimer = 0;
     this.hp = 100;
     this.stamina = 100;
     this.cameraYaw = Math.PI;
-    this.mesh.rotation.y = 0;
+    this.mesh.rotation.set(0, 0, 0);
   }
 
   respawnAtCheckpoint() {
@@ -206,15 +210,46 @@ class Player {
     this.velocity.set(0, 0, 0);
     this.isGrounded = false;
     this.isClimbing = false;
-    this.hp = Math.max(50, this.hp);
+    this.isDead = false;
+    this.deathRespawnTimer = 0;
+    this.hp = 100;
+    this.stamina = 100;
+    this.mesh.rotation.x = 0;
+    this.mesh.rotation.z = 0;
+  }
+
+  triggerInstantDeath(onFallDeathCallback) {
+    if (this.isDead) return;
+    this.isDead = true;
+    this.hp = 0;
+    this.deathRespawnTimer = 0.45;
+    if (window.soundManager) {
+      window.soundManager.playFall();
+    }
+    if (onFallDeathCallback) {
+      onFallDeathCallback();
+    }
   }
 
   triggerJump() {
     this.jumpBufferTimer = 0.16;
   }
 
-  update(delta, stage, onCheckpointCallback) {
+  update(delta, stage, onCheckpointCallback, onFallDeathCallback) {
     const THREE = this.THREE;
+
+    // Handle Instant-Death Respawn Delay
+    if (this.isDead) {
+      this.deathRespawnTimer -= delta;
+      this.position.y += this.velocity.y * delta;
+      this.mesh.rotation.x += 8.0 * delta;
+      this.mesh.position.copy(this.position);
+      this.shadowMesh.visible = false;
+      if (this.deathRespawnTimer <= 0) {
+        this.respawnAtCheckpoint();
+      }
+      return;
+    }
 
     if (this.invincibleTimer > 0) this.invincibleTimer -= delta;
 
@@ -227,7 +262,6 @@ class Player {
     this.jumpBufferTimer = Math.max(0, this.jumpBufferTimer - delta);
 
     // Camera-relative directions
-    // Camera sits at +sin(yaw), +cos(yaw) from player, so forward is -sin(yaw), -cos(yaw)
     const fwdX = -Math.sin(this.cameraYaw);
     const fwdZ = -Math.cos(this.cameraYaw);
     const rightX = -fwdZ;
@@ -261,14 +295,12 @@ class Player {
       this.velocity.x += moveX * accel * delta;
       this.velocity.z += moveZ * accel * delta;
 
-      // Smoothly rotate character toward movement direction
       const targetAngle = Math.atan2(moveX, moveZ);
       let diff = targetAngle - this.mesh.rotation.y;
       while (diff > Math.PI) diff -= Math.PI * 2;
       while (diff < -Math.PI) diff += Math.PI * 2;
       this.mesh.rotation.y += diff * Math.min(1, delta * 14);
     } else if (this.isGrounded) {
-      // Crisp, immediate stop when releasing keys
       const stopFactor = this.currentFriction < 0.2 ? 0.92 : 0.02;
       this.velocity.x *= Math.pow(stopFactor, delta * 35);
       this.velocity.z *= Math.pow(stopFactor, delta * 35);
@@ -302,7 +334,6 @@ class Player {
         this.jumpsRemaining = 1;
         if (window.soundManager) window.soundManager.playJump();
       } else if (this.jumpsRemaining > 0) {
-        // Double Jump!
         this.velocity.y = jumpSpeed * 0.92;
         this.jumpsRemaining--;
         this.jumpBufferTimer = 0;
@@ -327,6 +358,13 @@ class Player {
 
     // Platform & Climbing Collisions
     this.checkCollisions(stage, delta);
+
+    // INSTANT DEATH ON FALL ("落下したら即死")
+    // All platforms are at y >= -0.2; falling below y = -3.8 is an instant fall death!
+    if (this.position.y < -3.8) {
+      this.triggerInstantDeath(onFallDeathCallback);
+      return;
+    }
 
     // Check Checkpoints
     if (stage.checkpoints) {
@@ -399,7 +437,6 @@ class Player {
 
         // 2. Check Climbing on Giant Presents (Net / Ladder on side faces!)
         if (plat.userData.isClimbable && pY >= botY - 0.5 && pY < topY - 0.1) {
-          // Push player slightly outside box wall and climb up if moving or holding jump/climb
           const wantClimb = this.input.forward || this.input.jump || this.input.climb;
           if (wantClimb) {
             climbing = true;
@@ -415,14 +452,6 @@ class Player {
           }
         }
       }
-    }
-
-    // Valley Snow Floor safety collision at y = -5.5
-    if (!landed && !climbing && this.position.y <= -5.5) {
-      this.position.y = -5.5;
-      this.velocity.y = 0;
-      landed = true;
-      this.groundPlatform = null;
     }
 
     if (landed && !this.isGrounded) {
@@ -442,7 +471,6 @@ class Player {
     if (!parts) return;
 
     if (this.isClimbing) {
-      // Climbing net/ladder animation
       this.animTime += delta * 14;
       parts.leftArm.rotation.x = -Math.PI * 0.75 + Math.sin(this.animTime) * 0.45;
       parts.rightArm.rotation.x = -Math.PI * 0.75 - Math.sin(this.animTime) * 0.45;
@@ -459,7 +487,6 @@ class Player {
       parts.rightLeg.rotation.x = 0.35;
       parts.torsoGroup.rotation.x = 0.12;
     } else if (hSpeed > 0.35) {
-      // Running / Dashing cycle
       const rate = isDashing ? 18 : 12;
       this.animTime += delta * rate;
       const swing = Math.sin(this.animTime) * (isDashing ? 0.85 : 0.62);
@@ -472,7 +499,6 @@ class Player {
       parts.rightLeg.rotation.x = swing;
       parts.torsoGroup.rotation.x = isDashing ? 0.22 : 0.08;
     } else {
-      // Idle breathing
       this.animTime += delta * 3;
       parts.leftArm.rotation.set(0, 0, 0.1);
       parts.rightArm.rotation.set(0, 0, -0.1);
@@ -487,7 +513,7 @@ class Player {
     const pY = this.position.y;
     const pZ = this.position.z;
 
-    let highestYBelow = -5.5;
+    let highestYBelow = -999;
     for (let i = 0; i < stage.platforms.length; i++) {
       const plat = stage.platforms[i];
       const b = plat.userData.bounds;
@@ -507,12 +533,16 @@ class Player {
       }
     }
 
-    this.shadowMesh.visible = true;
-    this.shadowMesh.position.set(pX, highestYBelow + 0.03, pZ);
-    const heightAbove = Math.max(0, pY - highestYBelow);
-    const scale = Math.max(0.3, 1.0 - heightAbove * 0.04);
-    this.shadowMesh.scale.set(scale, scale, scale);
-    this.shadowMesh.material.opacity = Math.max(0.2, 0.68 - heightAbove * 0.025);
+    if (highestYBelow > -100) {
+      this.shadowMesh.visible = true;
+      this.shadowMesh.position.set(pX, highestYBelow + 0.03, pZ);
+      const heightAbove = Math.max(0, pY - highestYBelow);
+      const scale = Math.max(0.3, 1.0 - heightAbove * 0.04);
+      this.shadowMesh.scale.set(scale, scale, scale);
+      this.shadowMesh.material.opacity = Math.max(0.2, 0.68 - heightAbove * 0.025);
+    } else {
+      this.shadowMesh.visible = false;
+    }
   }
 
   updateCamera(camera) {
@@ -529,85 +559,4 @@ class Player {
   }
 }
 
-// AI Challenger Runners (Creates the exciting 30-Player Athletic Race feel!)
-class AIChallenger {
-  constructor(THREE, scene, waypoints, index) {
-    this.THREE = THREE;
-    this.scene = scene;
-    this.waypoints = waypoints;
-    this.wpIndex = 1;
-
-    const palettes = [
-      [0xff5252, 0xffd740, 0x69f0ae, 0x448aff],
-      [0xe040fb, 0x00e5ff, 0xffab40, 0x7c4dff],
-      [0x00e676, 0xffea00, 0xff1744, 0x2979ff]
-    ];
-    this.mesh = createWinterCharacterMesh(THREE, palettes[index % palettes.length]);
-    this.mesh.scale.setScalar(0.88);
-
-    const start = waypoints[0] || new THREE.Vector3(0, 1, 0);
-    this.offsetX = ((index % 5) - 2) * 1.4;
-    this.position = new THREE.Vector3(start.x + this.offsetX, start.y, start.z + (index * 1.6));
-    this.speed = 4.2 + (index % 5) * 0.45;
-    this.animPhase = index * 1.3;
-    this.finished = false;
-
-    this.mesh.position.copy(this.position);
-    this.scene.add(this.mesh);
-  }
-
-  update(delta) {
-    if (this.finished || !this.waypoints || this.waypoints.length < 2) return;
-
-    const target = this.waypoints[this.wpIndex];
-    if (!target) {
-      this.finished = true;
-      return;
-    }
-
-    const tx = target.x + this.offsetX * 0.5;
-    const ty = target.y;
-    const tz = target.z;
-
-    const dx = tx - this.position.x;
-    const dy = ty - this.position.y;
-    const dz = tz - this.position.z;
-    const dist = Math.hypot(dx, dz);
-
-    if (dist < 1.5) {
-      this.wpIndex++;
-      if (this.wpIndex >= this.waypoints.length) {
-        this.finished = true;
-      }
-      return;
-    }
-
-    const vx = (dx / dist) * this.speed;
-    const vz = (dz / dist) * this.speed;
-    this.position.x += vx * delta;
-    this.position.z += vz * delta;
-    this.position.y += dy * Math.min(1, delta * 4.5);
-
-    // Hop animation
-    this.animPhase += delta * 11;
-    const hop = Math.abs(Math.sin(this.animPhase)) * 0.35;
-    this.mesh.position.set(this.position.x, this.position.y + hop, this.position.z);
-    this.mesh.rotation.y = Math.atan2(vx, vz);
-
-    const parts = this.mesh.userData;
-    if (parts) {
-      const s = Math.sin(this.animPhase) * 0.6;
-      parts.leftArm.rotation.x = s;
-      parts.rightArm.rotation.x = -s;
-      parts.leftLeg.rotation.x = -s;
-      parts.rightLeg.rotation.x = s;
-    }
-  }
-
-  dispose() {
-    this.scene.remove(this.mesh);
-  }
-}
-
 window.Player = Player;
-window.AIChallenger = AIChallenger;

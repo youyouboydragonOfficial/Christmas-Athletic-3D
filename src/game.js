@@ -1,17 +1,17 @@
-// game.js - Master Controller for Christmas Athletic 3D (Matching Reference Image Scene, HUD & 30-Player Race)
+// game.js - Master Controller for Christmas Athletic 3D (1000 Rounds, Instant Fall Death, Classic Jingle Bells BGM)
 
 class Game {
   constructor() {
     this.currentStageNum = 1;
     this.maxStages = 1000;
+    this.currentRoundPage = 0; // 0..9 (100 rounds per page = 1000 rounds total)
     this.timeElapsed = 0;
-    this.snowflakesCollected = 12; // Starts at 12 like "❄️ × 12" in the reference image, increments as you collect!
+    this.snowflakesCollected = 12;
     this.isCleared = false;
     this.showGuideLabels = true;
     this.isDraggingMouse = false;
     this.lastMouseX = 0;
     this.lastMouseY = 0;
-    this.aiChallengers = [];
     this.labelElements = [];
 
     this.initThree();
@@ -108,11 +108,7 @@ class Game {
       this.scene.remove(this.currentStageGroup);
     }
 
-    // Clear old AI challengers
-    this.aiChallengers.forEach(ai => ai.dispose());
-    this.aiChallengers = [];
-
-    // Build stage
+    // Build stage (Round 1..1000)
     this.stageData = this.stageGenerator.buildStage(this.currentStageNum);
     this.currentStageGroup = this.stageData.stageGroup;
     this.scene.add(this.currentStageGroup);
@@ -125,12 +121,6 @@ class Game {
 
     // Reset Player
     this.player.reset(this.stageData.startPosition);
-
-    // Spawn AI Challengers along the course (for the 30-player athletic race feel!)
-    for (let i = 0; i < 12; i++) {
-      const ai = new AIChallenger(THREE, this.scene, this.stageData.aiWaypoints, i);
-      this.aiChallengers.push(ai);
-    }
 
     // Build 3D Floating Guide Labels ("雪の足場", "巨大なプレゼント", "動く床")
     this.createGuideLabelDOM();
@@ -195,6 +185,15 @@ class Game {
     }
   }
 
+  triggerDeathFlash() {
+    const flash = document.getElementById('death-flash');
+    if (flash) {
+      flash.classList.add('active');
+      setTimeout(() => flash.classList.remove('active'), 350);
+    }
+    this.setBannerText('💀 FALL! 落下即死！チェックポイントから再開！', 1800);
+  }
+
   formatTimer(sec) {
     const mins = Math.floor(sec / 60);
     const secs = Math.floor(sec % 60);
@@ -209,9 +208,7 @@ class Game {
     // Top Header Bar
     const stageEl = document.getElementById('hud-stage-name');
     if (stageEl) {
-      stageEl.innerText = this.currentStageNum === 1
-        ? 'STAGE: CHRISTMAS ATHLETIC'
-        : `STAGE ${this.currentStageNum}: CHRISTMAS ATHLETIC`;
+      stageEl.innerText = 'STAGE: CHRISTMAS ATHLETIC';
     }
 
     const timerEl = document.getElementById('hud-timer');
@@ -219,11 +216,9 @@ class Game {
       timerEl.innerText = `TIMER: ${this.formatTimer(this.timeElapsed)}`;
     }
 
-    // Active qualifiers count (starts 18/30 like the reference screenshot)
-    const activeCount = 18;
-    const playersEl = document.getElementById('hud-players');
-    if (playersEl) {
-      playersEl.innerText = `PLAYERS: ${activeCount}/30`;
+    const roundEl = document.getElementById('hud-round');
+    if (roundEl) {
+      roundEl.innerText = `ROUND: ${this.currentStageNum} / ${this.maxStages}`;
     }
 
     // HP & Stamina Bars
@@ -245,12 +240,12 @@ class Game {
 
   showClearModal() {
     this.isCleared = true;
-    this.setBannerText('🏆 STAGE CLEAR! 🏆');
+    this.setBannerText(`🏆 ROUND ${this.currentStageNum} CLEAR! 🏆`);
     if (window.soundManager) {
       window.soundManager.playClear();
     }
     const modal = document.getElementById('clear-modal');
-    document.getElementById('clear-stage-num').innerText = this.currentStageNum;
+    document.getElementById('clear-stage-num').innerText = `${this.currentStageNum} / 1000`;
     document.getElementById('clear-time').innerText = this.formatTimer(this.timeElapsed);
     document.getElementById('clear-bells').innerText = `❄️ ×${this.snowflakesCollected}`;
     modal.classList.remove('hidden');
@@ -276,7 +271,7 @@ class Game {
     });
 
     window.addEventListener('keydown', (e) => {
-      if (window.soundManager && !window.soundManager.initialized) {
+      if (window.soundManager) {
         window.soundManager.playBGM();
       }
 
@@ -311,7 +306,7 @@ class Game {
         window.soundManager.setMuted(isMuted);
       }
       if (e.code === 'KeyT') {
-        const tracks = ['fast', 'user_fast', 'calm'];
+        const tracks = ['classic', 'fast', 'user_fast', 'calm'];
         const nextIdx = (tracks.indexOf(window.soundManager.currentTrack) + 1) % tracks.length;
         window.soundManager.switchTrack(tracks[nextIdx]);
       }
@@ -402,24 +397,45 @@ class Game {
     const modal = document.getElementById('stage-select-modal');
     modal.classList.toggle('hidden');
     if (!modal.classList.contains('hidden')) {
+      this.currentRoundPage = Math.floor((this.currentStageNum - 1) / 100);
       this.populateStageGrid();
     }
   }
 
   populateStageGrid() {
+    const tabsEl = document.getElementById('round-range-tabs');
+    if (tabsEl) {
+      tabsEl.innerHTML = '';
+      for (let p = 0; p < 10; p++) {
+        const startR = p * 100 + 1;
+        const endR = (p + 1) * 100;
+        const tabBtn = document.createElement('button');
+        tabBtn.className = 'stage-btn' + (p === this.currentRoundPage ? ' active' : '');
+        tabBtn.style.fontSize = '11px';
+        tabBtn.style.padding = '6px 4px';
+        tabBtn.innerText = `${startR}〜${endR}`;
+        tabBtn.addEventListener('click', () => {
+          this.currentRoundPage = p;
+          this.populateStageGrid();
+        });
+        tabsEl.appendChild(tabBtn);
+      }
+    }
+
     const grid = document.getElementById('stage-grid');
     grid.innerHTML = '';
-    const milestones = [1, 2, 3, 5, 10, 25, 50, 100, 250, 500, 750, 1000];
-    milestones.forEach(s => {
+    const startRound = this.currentRoundPage * 100 + 1;
+    const endRound = startRound + 99;
+    for (let s = startRound; s <= endRound; s++) {
       const btn = document.createElement('button');
       btn.className = 'stage-btn' + (s === this.currentStageNum ? ' active' : '');
-      btn.innerText = `STAGE ${s}`;
+      btn.innerText = `R${s}`;
       btn.addEventListener('click', () => {
         this.loadStage(s);
         this.toggleStageSelectModal();
       });
       grid.appendChild(btn);
-    });
+    }
   }
 
   updateGimmicks(delta, time) {
@@ -455,11 +471,15 @@ class Game {
       haz.rotation.y += haz.userData.speed * delta;
       const d = this.player.position.distanceTo(haz.position);
       if (d < haz.userData.length * 0.45 && Math.abs(this.player.position.y - haz.position.y) < 1.2) {
-        if (this.player.invincibleTimer <= 0) {
-          this.player.hp = Math.max(10, this.player.hp - 20);
+        if (this.player.invincibleTimer <= 0 && !this.player.isDead) {
+          this.player.hp = Math.max(0, this.player.hp - 35);
           this.player.velocity.y = 8.5;
           this.player.invincibleTimer = 1.0;
-          if (window.soundManager) window.soundManager.playFall();
+          if (this.player.hp <= 0) {
+            this.player.triggerInstantDeath(() => this.triggerDeathFlash());
+          } else if (window.soundManager) {
+            window.soundManager.playFall();
+          }
         }
       }
     });
@@ -487,9 +507,6 @@ class Game {
     if (this.stageData.goalTree && this.stageData.goalTree.userData.update) {
       this.stageData.goalTree.userData.update(delta, time);
     }
-
-    // 6. Update AI Challengers
-    this.aiChallengers.forEach(ai => ai.update(delta));
   }
 
   updateSnow(delta) {
@@ -526,12 +543,19 @@ class Game {
 
     this.updateGimmicks(delta, time);
 
-    this.player.update(delta, this.stageData, () => {
-      this.setBannerText('✨ CHECKPOINT REACHED! ✨', 2200);
-    });
+    this.player.update(
+      delta,
+      this.stageData,
+      () => {
+        this.setBannerText('✨ CHECKPOINT REACHED! ✨', 2200);
+      },
+      () => {
+        this.triggerDeathFlash();
+      }
+    );
 
     // Goal Check (Reaching the Hilltop GOAL! Archway or Christmas Tree)
-    if (!this.isCleared) {
+    if (!this.isCleared && !this.player.isDead) {
       const distToGoal = this.player.position.distanceTo(this.stageData.goalPosition);
       if (distToGoal < 7.5) {
         this.showClearModal();

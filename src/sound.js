@@ -1,25 +1,26 @@
-// sound.js - 100% Reliable BGM & Instant Seamless Loop (No Fetch / Local File Compatible)
+// sound.js - 100% Reliable Classic Jingle Bells BGM & Instant Seamless Loop + Sound Effects
 
 class SoundManager {
   constructor() {
     this.audioCtx = null;
     this.isMuted = false;
-    this.bgmVolume = 0.65;
-    this.sfxVolume = 0.8;
-    this.currentTrack = 'fast';
+    this.bgmVolume = 0.72;
+    this.sfxVolume = 0.82;
+    this.currentTrack = 'classic';
     this.tracks = {
+      classic: 'assets/audio/jingle_bells_classic.wav',
       fast: 'assets/audio/jingle_bells_fast.mp3',
       user_fast: 'assets/audio/christmas_fast.mp3',
       calm: 'assets/audio/jingle_bells_calm.mp3'
     };
     this.bgmEl = null;
     this.initialized = false;
+    this.isPlaying = false;
   }
 
   init() {
     if (this.initialized) return;
 
-    // 1. Get or create audio element
     let el = document.getElementById('bgm-audio');
     if (!el) {
       el = document.createElement('audio');
@@ -32,18 +33,22 @@ class SoundManager {
     this.bgmEl.src = this.tracks[this.currentTrack];
     this.bgmEl.volume = this.isMuted ? 0 : this.bgmVolume;
 
-    // Instant seamless loop without delay
+    // Instant gapless loop
     this.bgmEl.addEventListener('timeupdate', () => {
-      if (this.bgmEl.duration > 0 && this.bgmEl.currentTime >= this.bgmEl.duration - 0.08) {
+      if (this.bgmEl.duration > 0 && this.bgmEl.currentTime >= this.bgmEl.duration - 0.06) {
         this.bgmEl.currentTime = 0;
+        if (this.bgmEl.paused && !this.isMuted) {
+          this.bgmEl.play().catch(() => {});
+        }
       }
     });
     this.bgmEl.addEventListener('ended', () => {
       this.bgmEl.currentTime = 0;
-      this.bgmEl.play().catch(() => {});
+      if (!this.isMuted) {
+        this.bgmEl.play().catch(() => {});
+      }
     });
 
-    // 2. Web Audio for Sound Effects
     try {
       const AudioContext = window.AudioContext || window.webkitAudioContext;
       this.audioCtx = new AudioContext();
@@ -55,15 +60,17 @@ class SoundManager {
   playBGM() {
     this.init();
     if (this.audioCtx && this.audioCtx.state === 'suspended') {
-      this.audioCtx.resume();
+      this.audioCtx.resume().catch(() => {});
     }
     if (this.bgmEl) {
       this.bgmEl.volume = this.isMuted ? 0 : this.bgmVolume;
-      const playPromise = this.bgmEl.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(err => {
-          console.log("Audio play caught:", err);
-        });
+      if (this.bgmEl.paused) {
+        const playPromise = this.bgmEl.play();
+        if (playPromise !== undefined) {
+          playPromise.then(() => {
+            this.isPlaying = true;
+          }).catch(() => {});
+        }
       }
     }
   }
@@ -71,6 +78,7 @@ class SoundManager {
   stopBGM() {
     if (this.bgmEl) {
       this.bgmEl.pause();
+      this.isPlaying = false;
     }
   }
 
@@ -78,11 +86,9 @@ class SoundManager {
     if (this.tracks[trackName]) {
       this.currentTrack = trackName;
       if (this.bgmEl) {
-        const wasPlaying = !this.bgmEl.paused;
         this.bgmEl.src = this.tracks[trackName];
-        if (wasPlaying) {
-          this.playBGM();
-        }
+        this.bgmEl.currentTime = 0;
+        this.playBGM();
       }
     }
   }
@@ -91,10 +97,13 @@ class SoundManager {
     this.isMuted = muted;
     if (this.bgmEl) {
       this.bgmEl.volume = muted ? 0 : this.bgmVolume;
+      if (!muted && this.bgmEl.paused) {
+        this.playBGM();
+      }
     }
   }
 
-  // --- Synthesized Sound Effects (Always work offline & in file://) ---
+  // --- Synthesized Sound Effects ---
 
   playJump() {
     if (this.isMuted || !this.audioCtx) return;
@@ -106,7 +115,7 @@ class SoundManager {
 
       osc.type = 'triangle';
       osc.frequency.setValueAtTime(380, t);
-      osc.frequency.exponentialRampToValueAtTime(750, t + 0.10);
+      osc.frequency.exponentialRampToValueAtTime(760, t + 0.10);
 
       gain.gain.setValueAtTime(0.24 * this.sfxVolume, t);
       gain.gain.exponentialRampToValueAtTime(0.01, t + 0.11);
@@ -123,21 +132,21 @@ class SoundManager {
     try {
       if (this.audioCtx.state === 'suspended') this.audioCtx.resume();
       const t = this.audioCtx.currentTime;
-      const bufferSize = this.audioCtx.sampleRate * 0.06;
+      const bufferSize = this.audioCtx.sampleRate * 0.05;
       const buffer = this.audioCtx.createBuffer(1, bufferSize, this.audioCtx.sampleRate);
       const data = buffer.getChannelData(0);
-      for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * 0.3;
+      for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * 0.28;
 
       const noise = this.audioCtx.createBufferSource();
       noise.buffer = buffer;
       const filter = this.audioCtx.createBiquadFilter();
       filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(450, t);
-      filter.frequency.linearRampToValueAtTime(80, t + 0.06);
+      filter.frequency.setValueAtTime(420, t);
+      filter.frequency.linearRampToValueAtTime(80, t + 0.05);
 
       const gain = this.audioCtx.createGain();
-      gain.gain.setValueAtTime(0.25 * this.sfxVolume, t);
-      gain.gain.linearRampToValueAtTime(0.01, t + 0.06);
+      gain.gain.setValueAtTime(0.22 * this.sfxVolume, t);
+      gain.gain.linearRampToValueAtTime(0.01, t + 0.05);
 
       noise.connect(filter);
       filter.connect(gain);
@@ -155,9 +164,9 @@ class SoundManager {
       const gain = this.audioCtx.createGain();
 
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(240, t);
-      osc.frequency.exponentialRampToValueAtTime(920, t + 0.12);
-      osc.frequency.exponentialRampToValueAtTime(650, t + 0.25);
+      osc.frequency.setValueAtTime(260, t);
+      osc.frequency.exponentialRampToValueAtTime(980, t + 0.14);
+      osc.frequency.exponentialRampToValueAtTime(680, t + 0.26);
 
       gain.gain.setValueAtTime(0.38 * this.sfxVolume, t);
       gain.gain.exponentialRampToValueAtTime(0.01, t + 0.28);
@@ -182,12 +191,12 @@ class SoundManager {
         osc.frequency.setValueAtTime(freq, t);
         const amp = (0.22 / (idx + 1)) * this.sfxVolume;
         gain.gain.setValueAtTime(amp, t);
-        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.40);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
 
         osc.connect(gain);
         gain.connect(this.audioCtx.destination);
         osc.start(t);
-        osc.stop(t + 0.42);
+        osc.stop(t + 0.40);
       });
     } catch (e) {}
   }
@@ -201,16 +210,16 @@ class SoundManager {
       const gain = this.audioCtx.createGain();
 
       osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(420, t);
-      osc.frequency.exponentialRampToValueAtTime(90, t + 0.35);
+      osc.frequency.setValueAtTime(440, t);
+      osc.frequency.exponentialRampToValueAtTime(75, t + 0.42);
 
-      gain.gain.setValueAtTime(0.22 * this.sfxVolume, t);
-      gain.gain.exponentialRampToValueAtTime(0.01, t + 0.38);
+      gain.gain.setValueAtTime(0.32 * this.sfxVolume, t);
+      gain.gain.exponentialRampToValueAtTime(0.01, t + 0.44);
 
       osc.connect(gain);
       gain.connect(this.audioCtx.destination);
       osc.start(t);
-      osc.stop(t + 0.39);
+      osc.stop(t + 0.45);
     } catch (e) {}
   }
 
@@ -239,7 +248,7 @@ class SoundManager {
 
         osc.type = 'triangle';
         osc.frequency.setValueAtTime(n.freq, t + n.time);
-        gain.gain.setValueAtTime(0.35 * this.sfxVolume, t + n.time);
+        gain.gain.setValueAtTime(0.36 * this.sfxVolume, t + n.time);
         gain.gain.exponentialRampToValueAtTime(0.01, t + n.time + n.dur);
 
         osc.connect(gain);
@@ -252,3 +261,12 @@ class SoundManager {
 }
 
 window.soundManager = new SoundManager();
+
+// Ensure BGM starts on any user interaction anywhere
+['click', 'pointerdown', 'mousedown', 'keydown'].forEach(evt => {
+  window.addEventListener(evt, () => {
+    if (window.soundManager && (!window.soundManager.isPlaying && !window.soundManager.isMuted)) {
+      window.soundManager.playBGM();
+    }
+  }, { passive: true });
+});
