@@ -507,8 +507,8 @@
   <!-- Bottom-Left Quick Utility Buttons -->
   <div id="bottom-left-bar">
     <button class="quick-btn" id="btn-open-guide">🗺️ ラウンド選択 (1〜1000)</button>
-    <button class="quick-btn" id="btn-bgm-toggle" onclick="window.soundManager.setMuted(!window.soundManager.isMuted); this.innerText = window.soundManager.isMuted ? '🔇 BGM OFF' : '🎵 ジングルベル ON';">🎵 ジングルベル ON</button>
-    <button class="quick-btn" id="btn-bgm-switch" onclick="const t=['classic','fast','user_fast','calm']; const n=t[(t.indexOf(window.soundManager.currentTrack)+1)%t.length]; window.soundManager.switchTrack(n);">🔔 BGMアレンジ切替</button>
+    <button class="quick-btn" id="btn-bgm-toggle" onclick="window.soundManager.setMuted(!window.soundManager.isMuted); this.innerText = window.soundManager.isMuted ? '🔇 BGM OFF' : '🎵 BGM ON';">🎵 BGM ON</button>
+    <button class="quick-btn" id="btn-bgm-switch" onclick="window.soundManager.nextTrack();">🔔 BGM [1/8]: ジングルベル (王道ソリの鈴)</button>
   </div>
 
   <!-- Stage Clear Modal -->

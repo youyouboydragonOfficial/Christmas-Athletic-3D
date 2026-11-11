@@ -1,4 +1,4 @@
-// gimmicks.js - Authentic Athletic Course Structures Matching Reference Image
+// gimmicks.js - Authentic Athletic Course Structures & Interactive Christmas Gimmicks
 
 const GimmickType = {
   SNOW_SCAFFOLD: 'snow_scaffold',
@@ -7,8 +7,8 @@ const GimmickType = {
   MOVING_CANDY_DECK: 'moving_candy_deck',
   ROPE_BRIDGE: 'rope_bridge',
   NET_RAMP: 'net_ramp',
-  ICE_SLIDE: 'ice_slide',
-  CRUMBLE_SNOW: 'crumble_snow',
+  COLLAPSING_ICE: 'collapsing_ice',
+  SANTA_DRUM: 'santa_drum',
   SPINNING_HAZARD: 'spinning_hazard',
   CHECKPOINT: 'checkpoint',
   COIN: 'coin',
@@ -48,6 +48,15 @@ class GimmickFactory {
       roughness: 0.12,
       metalness: 0.35
     });
+    this.translucentIceMat = new THREE.MeshStandardMaterial({
+      color: 0x80e5ff,
+      emissive: 0x005588,
+      emissiveIntensity: 0.35,
+      roughness: 0.1,
+      metalness: 0.25,
+      transparent: true,
+      opacity: 0.82
+    });
     this.glowPadMat = new THREE.MeshBasicMaterial({
       color: 0x44ddff
     });
@@ -81,7 +90,6 @@ class GimmickFactory {
     const THREE = this.THREE;
     const group = new THREE.Group();
 
-    // Wooden Plank Deck
     const deckH = h * 0.55;
     const deck = new THREE.Mesh(
       new THREE.BoxGeometry(w, deckH, d),
@@ -92,7 +100,6 @@ class GimmickFactory {
     deck.receiveShadow = true;
     group.add(deck);
 
-    // Puffy Snow Drift Top
     const snowH = h * 0.55;
     const snowTop = new THREE.Mesh(
       new THREE.BoxGeometry(w + 0.25, snowH, d + 0.25),
@@ -103,7 +110,6 @@ class GimmickFactory {
     snowTop.receiveShadow = true;
     group.add(snowTop);
 
-    // 4 Corner Wooden Log Pillars extending down to ground
     const postR = 0.28;
     const postGeo = new THREE.CylinderGeometry(postR, postR * 1.1, legHeight + 1.2, 8);
     const ox = w / 2 - 0.35;
@@ -119,7 +125,6 @@ class GimmickFactory {
       group.add(post);
     });
 
-    // Horizontal Wooden Cross Beams
     if (legHeight >= 3.5) {
       const beamX = new THREE.Mesh(new THREE.BoxGeometry(w, 0.26, 0.26), this.woodLogMat);
       beamX.position.set(0, -legHeight * 0.45, oz);
@@ -146,7 +151,7 @@ class GimmickFactory {
     return group;
   }
 
-  // 2. Glowing "CHECKPOINT" Gate (Mounted on a Platform)
+  // 2. Glowing "CHECKPOINT" Gate
   createCheckpointGate(width = 4.6, height = 4.2) {
     const THREE = this.THREE;
     const group = new THREE.Group();
@@ -158,7 +163,6 @@ class GimmickFactory {
       roughness: 0.2
     });
 
-    // Left & Right Glowing Pillars
     const postGeo = new THREE.BoxGeometry(0.28, height, 0.28);
     const postL = new THREE.Mesh(postGeo, frameMat);
     postL.position.set(-width / 2, height / 2, 0);
@@ -168,12 +172,10 @@ class GimmickFactory {
     postR.position.set(width / 2, height / 2, 0);
     group.add(postR);
 
-    // Top Crossbar
     const topBar = new THREE.Mesh(new THREE.BoxGeometry(width + 0.4, 0.28, 0.28), frameMat);
     topBar.position.set(0, height, 0);
     group.add(topBar);
 
-    // Signboard with "CHECKPOINT"
     const signCanvas = window.createTextCanvas('CHECKPOINT', 512, 128, {
       bgColor: 'rgba(35, 25, 15, 0.92)',
       borderColor: '#ffd54f',
@@ -219,37 +221,32 @@ class GimmickFactory {
     const upperW = w * 0.92;
     const upperD = d * 0.92;
 
-    const lowerMat = variant % 2 === 0 ? this.presentGreenMat : this.presentRedMat;
-    const upperMat = variant % 2 === 0 ? this.presentRedMat : this.presentGreenMat;
+    const lowerMat = variant % 3 === 0 ? this.presentGreenMat : (variant % 3 === 1 ? this.presentRedMat : this.presentBlueMat);
+    const upperMat = variant % 3 === 0 ? this.presentRedMat : (variant % 3 === 1 ? this.presentGreenMat : this.presentRedMat);
     const lowerRibMat = variant % 2 === 0 ? this.ribbonRedMat : this.ribbonGoldMat;
-    const upperRibMat = variant % 2 === 0 ? this.ribbonGreenMat : this.ribbonRedMat;
+    const upperRibMat = variant % 2 === 0 ? this.ribbonGreenMat : this.ribbonGoldMat;
 
-    // Lower Box
     const lowerBox = new THREE.Mesh(new THREE.BoxGeometry(w, lowerH, d), lowerMat);
     lowerBox.position.y = -h / 2 + lowerH / 2;
     lowerBox.castShadow = true;
     lowerBox.receiveShadow = true;
     group.add(lowerBox);
 
-    // Lower Ribbon
     const lRib = new THREE.Mesh(new THREE.BoxGeometry(w + 0.08, lowerH + 0.04, d * 0.16), lowerRibMat);
     lRib.position.copy(lowerBox.position);
     group.add(lRib);
 
-    // Upper Box
     const upperBox = new THREE.Mesh(new THREE.BoxGeometry(upperW, upperH, upperD), upperMat);
     upperBox.position.y = h / 2 - upperH / 2;
     upperBox.castShadow = true;
     upperBox.receiveShadow = true;
     group.add(upperBox);
 
-    // Upper Overhanging Lid
     const lid = new THREE.Mesh(new THREE.BoxGeometry(upperW + 0.45, 0.65, upperD + 0.45), upperMat);
     lid.position.y = h / 2 - 0.25;
     lid.castShadow = true;
     group.add(lid);
 
-    // Upper Ribbons
     const uRibX = new THREE.Mesh(new THREE.BoxGeometry(upperW + 0.5, upperH + 0.08, upperD * 0.16), upperRibMat);
     uRibX.position.copy(upperBox.position);
     group.add(uRibX);
@@ -258,7 +255,6 @@ class GimmickFactory {
     uRibZ.position.copy(upperBox.position);
     group.add(uRibZ);
 
-    // Giant Festive Bow on Top
     const bowGroup = new THREE.Group();
     bowGroup.position.y = h / 2 + 0.45;
     for (let a = 0; a < 4; a++) {
@@ -334,7 +330,6 @@ class GimmickFactory {
     const THREE = this.THREE;
     const group = new THREE.Group();
 
-    // Glowing Circular Base Pad
     const baseDisk = new THREE.Mesh(
       new THREE.CylinderGeometry(radius * 0.72, radius * 0.82, 0.55, 24),
       new THREE.MeshStandardMaterial({ color: 0x102a45, roughness: 0.3, metalness: 0.6 })
@@ -350,7 +345,6 @@ class GimmickFactory {
     glowRing.position.y = -0.1;
     group.add(glowRing);
 
-    // 6-Pointed 3D Crystal Snowflake
     const flakeGroup = new THREE.Group();
     const armLen = radius * 1.95;
 
@@ -368,7 +362,6 @@ class GimmickFactory {
         armWrapper.add(mainArm);
       }
 
-      // Dendritic V-branches along each arm
       [0.45, 0.72].forEach(frac => {
         const dist = (armLen / 2) * frac;
         const bLen = radius * (0.55 - frac * 0.2);
@@ -393,7 +386,6 @@ class GimmickFactory {
       flakeGroup.add(armWrapper);
     }
 
-    // Center Hexagonal Core
     const hexCore = new THREE.Mesh(
       new THREE.CylinderGeometry(radius * 0.38, radius * 0.38, 0.46, 6),
       this.iceCrystalMat
@@ -401,7 +393,6 @@ class GimmickFactory {
     flakeGroup.add(hexCore);
     group.add(flakeGroup);
 
-    // Create Glowing 3D Jump Trajectory Arc (Just like the cyan-white arcs in the image!)
     const curvePoints = [];
     const simSteps = 24;
     const g = 25.0;
@@ -438,7 +429,6 @@ class GimmickFactory {
     const THREE = this.THREE;
     const group = new THREE.Group();
 
-    // Wooden Base + Snow Top
     const deck = new THREE.Mesh(new THREE.BoxGeometry(w, h * 0.5, d), this.woodPlankMat);
     deck.position.y = -h * 0.2;
     deck.castShadow = true;
@@ -449,12 +439,10 @@ class GimmickFactory {
     snow.receiveShadow = true;
     group.add(snow);
 
-    // 2 Giant Striped Candy Canes Framing the Moving Platform (Just like the image!)
     [-w / 2 - 0.35, w / 2 + 0.35].forEach(cx => {
       const caneGroup = new THREE.Group();
       caneGroup.position.set(cx, 0, 0);
 
-      // Vertical Striped Shaft
       const segs = 10;
       const shaftH = 4.2;
       const segH = shaftH / segs;
@@ -467,7 +455,6 @@ class GimmickFactory {
         caneGroup.add(seg);
       }
 
-      // Curved Hook Top
       const hook = new THREE.Mesh(
         new THREE.TorusGeometry(0.65, 0.28, 10, 18, Math.PI),
         this.candyRedMat
@@ -491,14 +478,94 @@ class GimmickFactory {
     return group;
   }
 
-  // 6. Suspension Rope Bridge & Net Bridge Between Two Points
+  // 6. Collapsing Ice Crystal Platform ("氷の崩れる足場")
+  createCollapsingIcePlatform(w = 4.2, h = 0.8, d = 4.2) {
+    const THREE = this.THREE;
+    const group = new THREE.Group();
+
+    const slab = new THREE.Mesh(
+      new THREE.BoxGeometry(w, h, d),
+      this.translucentIceMat.clone()
+    );
+    slab.castShadow = true;
+    slab.receiveShadow = true;
+    group.add(slab);
+
+    // Icicles underneath
+    for (let i = 0; i < 6; i++) {
+      const icicle = new THREE.Mesh(
+        new THREE.ConeGeometry(0.28, 1.3, 5),
+        this.iceCrystalMat
+      );
+      icicle.rotation.x = Math.PI;
+      icicle.position.set(
+        (Math.cos(i * 1.1) * w * 0.32),
+        -h / 2 - 0.6,
+        (Math.sin(i * 1.7) * d * 0.32)
+      );
+      group.add(icicle);
+    }
+
+    group.userData = {
+      type: GimmickType.COLLAPSING_ICE,
+      friction: 0.45,
+      bounds: { w, h, d },
+      triggered: false,
+      collapsed: false,
+      timer: 0,
+      baseY: 0,
+      slab
+    };
+    return group;
+  }
+
+  // 7. Festive Santa Drum Trampoline ("サンタの太鼓トランポリン")
+  createSantaDrumTrampoline(radius = 2.8, bounceY = 21.5) {
+    const THREE = this.THREE;
+    const group = new THREE.Group();
+
+    const drumBody = new THREE.Mesh(
+      new THREE.CylinderGeometry(radius, radius, 1.8, 20),
+      this.presentRedMat
+    );
+    drumBody.position.y = -0.5;
+    group.add(drumBody);
+
+    const drumTop = new THREE.Mesh(
+      new THREE.CylinderGeometry(radius * 0.94, radius * 0.94, 0.25, 20),
+      new THREE.MeshStandardMaterial({ color: 0xfff8e1, emissive: 0x443300, roughness: 0.3 })
+    );
+    drumTop.position.y = 0.35;
+    group.add(drumTop);
+
+    const rimTop = new THREE.Mesh(
+      new THREE.TorusGeometry(radius, 0.16, 8, 24),
+      this.ribbonGoldMat
+    );
+    rimTop.rotation.x = Math.PI / 2;
+    rimTop.position.y = 0.4;
+    group.add(rimTop);
+
+    const rimBot = rimTop.clone();
+    rimBot.position.y = -1.35;
+    group.add(rimBot);
+
+    group.userData = {
+      type: GimmickType.SNOWFLAKE_PAD,
+      friction: 0.85,
+      bounceVelocity: new THREE.Vector3(0, bounceY, 5.5),
+      bounds: { w: radius * 1.85, h: 1.0, d: radius * 1.85 }
+    };
+    return group;
+  }
+
+  // 8. Suspension Rope Bridge & Net Bridge Between Two Points
   createRopeBridge(startPos, endPos, width = 2.6, isNet = false) {
     const THREE = this.THREE;
     const bridgeGroup = new THREE.Group();
     const stepPlatforms = [];
 
     const diff = new THREE.Vector3().subVectors(endPos, startPos);
-    const totalHorizontalDist = Math.hypot(diff.x, diff.z);
     const totalDist = diff.length();
     const angleY = Math.atan2(diff.x, diff.z);
 
@@ -506,7 +573,6 @@ class GimmickFactory {
 
     for (let i = 1; i < plankCount; i++) {
       const t = i / plankCount;
-      // Subtle suspension sag in the middle
       const sag = isNet ? 0 : Math.sin(t * Math.PI) * 0.45;
 
       const px = startPos.x + diff.x * t;
@@ -525,7 +591,6 @@ class GimmickFactory {
       mesh.receiveShadow = true;
       plank.add(mesh);
 
-      // Side rope handrails
       if (!isNet && i % 2 === 1) {
         [-width / 2, width / 2].forEach(rx => {
           const post = new THREE.Mesh(
@@ -550,13 +615,12 @@ class GimmickFactory {
     return { bridgeGroup, stepPlatforms };
   }
 
-  // 7. Collectible Gold Coin & Glowing Snowflake Token
+  // 9. Collectible Gold Coin & Glowing Snowflake Token
   createCollectible(isSnowflake = false) {
     const THREE = this.THREE;
     const group = new THREE.Group();
 
     if (isSnowflake) {
-      // Glowing Crystal Snowflake Token
       for (let i = 0; i < 3; i++) {
         const bar = new THREE.Mesh(
           new THREE.BoxGeometry(0.14, 0.95, 0.14),
@@ -566,7 +630,6 @@ class GimmickFactory {
         group.add(bar);
       }
     } else {
-      // Glowing Gold Star Coin (like in the reference screenshot)
       const coin = new THREE.Mesh(
         new THREE.CylinderGeometry(0.45, 0.45, 0.12, 16),
         this.goldCoinMat
@@ -584,7 +647,7 @@ class GimmickFactory {
     return group;
   }
 
-  // 8. Spinning Candy Cane Sweeper Hazard
+  // 10. Spinning Candy Cane Sweeper Hazard
   createSpinningSweeper(length = 6.5, speed = 1.6) {
     const THREE = this.THREE;
     const group = new THREE.Group();

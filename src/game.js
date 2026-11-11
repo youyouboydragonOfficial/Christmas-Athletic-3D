@@ -1,10 +1,10 @@
-// game.js - Master Controller for Christmas Athletic 3D (1000 Rounds, Instant Fall Death, Classic Jingle Bells BGM)
+// game.js - Master Controller for Christmas Athletic 3D (1000 Unique Long Rounds, Santa Wonderland Sky, 8 Christmas BGMs)
 
 class Game {
   constructor() {
     this.currentStageNum = 1;
     this.maxStages = 1000;
-    this.currentRoundPage = 0; // 0..9 (100 rounds per page = 1000 rounds total)
+    this.currentRoundPage = 0;
     this.timeElapsed = 0;
     this.snowflakesCollected = 12;
     this.isCleared = false;
@@ -31,10 +31,10 @@ class Game {
     const height = window.innerHeight;
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x232952);
-    this.scene.fog = new THREE.FogExp2(0x3b3d68, 0.0065);
+    this.scene.background = new THREE.Color(0x111936);
+    this.scene.fog = new THREE.FogExp2(0x263159, 0.0042);
 
-    this.camera = new THREE.PerspectiveCamera(56, width / height, 0.1, 800);
+    this.camera = new THREE.PerspectiveCamera(56, width / height, 0.1, 900);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     this.renderer.setSize(width, height);
@@ -44,7 +44,7 @@ class Game {
     this.container.appendChild(this.renderer.domElement);
 
     // Rich Twilight + Warm Festive Lighting
-    this.hemiLight = new THREE.HemisphereLight(0xb8d0ff, 0x4a3b5c, 0.85);
+    this.hemiLight = new THREE.HemisphereLight(0xc2dcff, 0x4a3b5c, 0.9);
     this.scene.add(this.hemiLight);
 
     this.sunLight = new THREE.DirectionalLight(0xffe8cc, 1.35);
@@ -119,13 +119,18 @@ class Game {
     this.scene.fog.color.setHex(theme.fog);
     this.sunLight.color.setHex(theme.light);
 
+    // Rotate Christmas BGM track for each Round!
+    if (window.soundManager) {
+      window.soundManager.setTrackByStage(this.currentStageNum);
+    }
+
     // Reset Player
     this.player.reset(this.stageData.startPosition);
 
-    // Build 3D Floating Guide Labels ("雪の足場", "巨大なプレゼント", "動く床")
+    // Build 3D Floating Guide Labels
     this.createGuideLabelDOM();
 
-    this.setBannerText('REACH THE GOAL!');
+    this.setBannerText(`🎅 ${this.stageData.info.subtitle} — REACH THE GOAL!`);
     this.hideClearModal();
     this.updateHUD();
   }
@@ -205,10 +210,9 @@ class Game {
   }
 
   updateHUD() {
-    // Top Header Bar
     const stageEl = document.getElementById('hud-stage-name');
-    if (stageEl) {
-      stageEl.innerText = 'STAGE: CHRISTMAS ATHLETIC';
+    if (stageEl && this.stageData) {
+      stageEl.innerText = `STAGE: ${this.stageData.info.theme.name}`;
     }
 
     const timerEl = document.getElementById('hud-timer');
@@ -221,7 +225,6 @@ class Game {
       roundEl.innerText = `ROUND: ${this.currentStageNum} / ${this.maxStages}`;
     }
 
-    // HP & Stamina Bars
     const hpFill = document.getElementById('hp-bar-fill');
     if (hpFill) {
       hpFill.style.width = `${Math.max(0, Math.min(100, this.player.hp))}%`;
@@ -231,7 +234,6 @@ class Game {
       stamFill.style.width = `${Math.max(0, Math.min(100, this.player.stamina))}%`;
     }
 
-    // Snowflake Counter
     const snowCountEl = document.getElementById('hud-snowflake-count');
     if (snowCountEl) {
       snowCountEl.innerText = `×${this.snowflakesCollected}`;
@@ -240,7 +242,7 @@ class Game {
 
   showClearModal() {
     this.isCleared = true;
-    this.setBannerText(`🏆 ROUND ${this.currentStageNum} CLEAR! 🏆`);
+    this.setBannerText(`🎅 ROUND ${this.currentStageNum} CLEAR! MERRY CHRISTMAS! 🎄`);
     if (window.soundManager) {
       window.soundManager.playClear();
     }
@@ -306,9 +308,9 @@ class Game {
         window.soundManager.setMuted(isMuted);
       }
       if (e.code === 'KeyT') {
-        const tracks = ['classic', 'fast', 'user_fast', 'calm'];
-        const nextIdx = (tracks.indexOf(window.soundManager.currentTrack) + 1) % tracks.length;
-        window.soundManager.switchTrack(tracks[nextIdx]);
+        if (window.soundManager) {
+          window.soundManager.nextTrack();
+        }
       }
       if (e.code === 'Escape' || e.code === 'Tab') {
         e.preventDefault();
@@ -459,14 +461,41 @@ class Game {
       );
     });
 
-    // 2. Rotate Snowflake Pads gently
+    // 2. Collapsing Ice Crystal Platforms ("氷の崩れる足場")
+    if (this.stageData.collapsingObjects) {
+      this.stageData.collapsingObjects.forEach(ice => {
+        const u = ice.userData;
+        if (u.triggered && !u.collapsed) {
+          u.timer += delta;
+          // Shake warning before collapse
+          ice.position.x += Math.sin(time * 55) * 0.04;
+          if (u.timer >= 0.85) {
+            u.collapsed = true;
+            u.timer = 0;
+            ice.visible = false;
+            if (window.soundManager) window.soundManager.playFall();
+          }
+        } else if (u.collapsed) {
+          u.timer += delta;
+          if (u.timer >= 3.0) {
+            u.collapsed = false;
+            u.triggered = false;
+            u.timer = 0;
+            ice.position.y = u.baseY;
+            ice.visible = true;
+          }
+        }
+      });
+    }
+
+    // 3. Rotate Snowflake Pads gently
     this.stageData.platforms.forEach(plat => {
       if (plat.userData.type === GimmickType.SNOWFLAKE_PAD && plat.userData.flakeGroup) {
         plat.userData.flakeGroup.rotation.y += 0.45 * delta;
       }
     });
 
-    // 3. Spinning Candy Hazards
+    // 4. Spinning Candy Hazards
     this.stageData.hazardObjects.forEach(haz => {
       haz.rotation.y += haz.userData.speed * delta;
       const d = this.player.position.distanceTo(haz.position);
@@ -484,7 +513,7 @@ class Game {
       }
     });
 
-    // 4. Collectible Coins & Snowflakes
+    // 5. Collectible Coins & Snowflakes
     this.stageData.collectibles.forEach(item => {
       if (!item.userData.collected) {
         item.rotation.y += 2.6 * delta;
@@ -500,12 +529,60 @@ class Game {
       }
     });
 
-    // 5. Update Goal Archway & Grand Christmas Tree Lights
+    // 6. Update Goal Archway, Grand Christmas Tree & Santa Claus!
     if (this.stageData.goalArch && this.stageData.goalArch.userData.update) {
       this.stageData.goalArch.userData.update(delta, time);
     }
     if (this.stageData.goalTree && this.stageData.goalTree.userData.update) {
       this.stageData.goalTree.userData.update(delta, time);
+    }
+    if (this.stageData.startSanta && this.stageData.startSanta.userData.rightArm) {
+      this.stageData.startSanta.userData.rightArm.rotation.z = -0.55 + Math.sin(time * 4.5) * 0.35;
+    }
+    if (this.stageData.goalSanta && this.stageData.goalSanta.userData.rightArm) {
+      this.stageData.goalSanta.userData.rightArm.rotation.z = -0.55 + Math.sin(time * 5.5) * 0.4;
+    }
+
+    // 7. Update Flying Santa Sleighs & Aurora Sky!
+    if (this.stageData.envData) {
+      const env = this.stageData.envData;
+      if (env.skyWonderland && env.skyWonderland.userData.update) {
+        env.skyWonderland.userData.update(delta, time);
+      }
+
+      // Sleigh 1: Soaring across the Full Moon & Aurora sky in a wide figure-8
+      if (env.santaSleighHigh) {
+        const s1 = env.santaSleighHigh;
+        const t1 = time * 0.32;
+        const nextT1 = t1 + 0.05;
+        const x1 = Math.sin(t1) * 48;
+        const y1 = 26 + Math.sin(t1 * 2) * 5;
+        const z1 = this.player.position.z + 42 + Math.cos(t1) * 28;
+        const nx1 = Math.sin(nextT1) * 48;
+        const ny1 = 26 + Math.sin(nextT1 * 2) * 5;
+        const nz1 = this.player.position.z + 42 + Math.cos(nextT1) * 28;
+
+        s1.position.set(x1, y1, z1);
+        s1.lookAt(nx1, ny1, nz1);
+        if (s1.userData.update) s1.userData.update(delta, time);
+      }
+
+      // Sleigh 2: Flying along the course ahead of the player
+      if (env.santaSleighMid) {
+        const s2 = env.santaSleighMid;
+        const t2 = time * 0.45 + 2.2;
+        const nextT2 = t2 + 0.05;
+        const x2 = Math.cos(t2) * 35;
+        const y2 = 18 + Math.sin(t2 * 1.5) * 4;
+        const z2 = this.player.position.z + 28 + Math.sin(t2) * 22;
+        const nx2 = Math.cos(nextT2) * 35;
+        const ny2 = 18 + Math.sin(nextT2 * 1.5) * 4;
+        const nz2 = this.player.position.z + 28 + Math.sin(nextT2) * 22;
+
+        s2.position.set(x2, y2, z2);
+        s2.lookAt(nx2, ny2, nz2);
+        if (s2.userData.update) s2.userData.update(delta, time);
+      }
     }
   }
 
@@ -554,7 +631,6 @@ class Game {
       }
     );
 
-    // Goal Check (Reaching the Hilltop GOAL! Archway or Christmas Tree)
     if (!this.isCleared && !this.player.isDead) {
       const distToGoal = this.player.position.distanceTo(this.stageData.goalPosition);
       if (distToGoal < 7.5) {

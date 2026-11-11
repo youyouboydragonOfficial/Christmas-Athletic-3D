@@ -1,4 +1,4 @@
-// sound.js - 100% Reliable Classic Jingle Bells BGM & Instant Seamless Loop + Sound Effects
+// sound.js - 8 Festive Instrumental Christmas BGM Tracks + Instant Seamless Loop & Sound Effects
 
 class SoundManager {
   constructor() {
@@ -6,13 +6,19 @@ class SoundManager {
     this.isMuted = false;
     this.bgmVolume = 0.72;
     this.sfxVolume = 0.82;
-    this.currentTrack = 'classic';
-    this.tracks = {
-      classic: 'assets/audio/jingle_bells_classic.wav',
-      fast: 'assets/audio/jingle_bells_fast.mp3',
-      user_fast: 'assets/audio/christmas_fast.mp3',
-      calm: 'assets/audio/jingle_bells_calm.mp3'
-    };
+    this.trackIndex = 0;
+
+    this.playlist = [
+      { id: 'classic', title: 'ジングルベル (王道ソリの鈴)', src: 'assets/audio/jingle_bells_classic.wav' },
+      { id: 'santa', title: 'サンタのソリ遊び (Housetop)', src: 'assets/audio/santa_sleigh_ride.wav' },
+      { id: 'deck', title: 'ひいらぎかざろう (Deck the Halls)', src: 'assets/audio/deck_the_halls.wav' },
+      { id: 'wish', title: 'メリー・クリスマス (We Wish You)', src: 'assets/audio/we_wish_you_merry_christmas.wav' },
+      { id: 'joy', title: 'もろびとこぞりて (Joy to the World)', src: 'assets/audio/joy_to_the_world.wav' },
+      { id: 'fast', title: 'ジングルベル (アップビートバンド)', src: 'assets/audio/jingle_bells_fast.mp3' },
+      { id: 'user_fast', title: 'クリスマス・ブラスマーチ', src: 'assets/audio/christmas_fast.mp3' },
+      { id: 'calm', title: '聖夜のジングルベル (Calm)', src: 'assets/audio/jingle_bells_calm.mp3' }
+    ];
+
     this.bgmEl = null;
     this.initialized = false;
     this.isPlaying = false;
@@ -30,10 +36,10 @@ class SoundManager {
       document.body.appendChild(el);
     }
     this.bgmEl = el;
-    this.bgmEl.src = this.tracks[this.currentTrack];
+    this.bgmEl.src = this.playlist[this.trackIndex].src;
     this.bgmEl.volume = this.isMuted ? 0 : this.bgmVolume;
 
-    // Instant gapless loop
+    // Instant gapless loop when song finishes
     this.bgmEl.addEventListener('timeupdate', () => {
       if (this.bgmEl.duration > 0 && this.bgmEl.currentTime >= this.bgmEl.duration - 0.06) {
         this.bgmEl.currentTime = 0;
@@ -55,6 +61,19 @@ class SoundManager {
     } catch (e) {}
 
     this.initialized = true;
+    this.updateTrackButtonLabel();
+  }
+
+  getCurrentTrackInfo() {
+    return this.playlist[this.trackIndex];
+  }
+
+  updateTrackButtonLabel() {
+    const btn = document.getElementById('btn-bgm-switch');
+    if (btn) {
+      const info = this.getCurrentTrackInfo();
+      btn.innerText = `🔔 BGM [${this.trackIndex + 1}/${this.playlist.length}]: ${info.title}`;
+    }
   }
 
   playBGM() {
@@ -75,22 +94,31 @@ class SoundManager {
     }
   }
 
-  stopBGM() {
+  nextTrack() {
+    this.init();
+    this.trackIndex = (this.trackIndex + 1) % this.playlist.length;
     if (this.bgmEl) {
-      this.bgmEl.pause();
-      this.isPlaying = false;
+      this.bgmEl.src = this.playlist[this.trackIndex].src;
+      this.bgmEl.currentTime = 0;
+      this.playBGM();
     }
+    this.updateTrackButtonLabel();
   }
 
-  switchTrack(trackName) {
-    if (this.tracks[trackName]) {
-      this.currentTrack = trackName;
+  setTrackByStage(stageNum) {
+    this.init();
+    const newIdx = (stageNum - 1) % this.playlist.length;
+    if (newIdx !== this.trackIndex) {
+      this.trackIndex = newIdx;
       if (this.bgmEl) {
-        this.bgmEl.src = this.tracks[trackName];
+        this.bgmEl.src = this.playlist[this.trackIndex].src;
         this.bgmEl.currentTime = 0;
-        this.playBGM();
+        if (this.isPlaying && !this.isMuted) {
+          this.bgmEl.play().catch(() => {});
+        }
       }
     }
+    this.updateTrackButtonLabel();
   }
 
   setMuted(muted) {
@@ -229,17 +257,17 @@ class SoundManager {
       if (this.audioCtx.state === 'suspended') this.audioCtx.resume();
       const t = this.audioCtx.currentTime;
       const notes = [
-        { freq: 659.25, time: 0.00, dur: 0.10 }, // E5
-        { freq: 659.25, time: 0.12, dur: 0.10 }, // E5
-        { freq: 659.25, time: 0.24, dur: 0.20 }, // E5
-        { freq: 659.25, time: 0.48, dur: 0.10 }, // E5
-        { freq: 659.25, time: 0.60, dur: 0.10 }, // E5
-        { freq: 659.25, time: 0.72, dur: 0.20 }, // E5
-        { freq: 659.25, time: 0.96, dur: 0.11 }, // E5
-        { freq: 783.99, time: 1.08, dur: 0.11 }, // G5
-        { freq: 523.25, time: 1.20, dur: 0.14 }, // C5
-        { freq: 587.33, time: 1.36, dur: 0.14 }, // D5
-        { freq: 659.25, time: 1.52, dur: 0.45 }  // E5
+        { freq: 659.25, time: 0.00, dur: 0.10 },
+        { freq: 659.25, time: 0.12, dur: 0.10 },
+        { freq: 659.25, time: 0.24, dur: 0.20 },
+        { freq: 659.25, time: 0.48, dur: 0.10 },
+        { freq: 659.25, time: 0.60, dur: 0.10 },
+        { freq: 659.25, time: 0.72, dur: 0.20 },
+        { freq: 659.25, time: 0.96, dur: 0.11 },
+        { freq: 783.99, time: 1.08, dur: 0.11 },
+        { freq: 523.25, time: 1.20, dur: 0.14 },
+        { freq: 587.33, time: 1.36, dur: 0.14 },
+        { freq: 659.25, time: 1.52, dur: 0.45 }
       ];
 
       notes.forEach(n => {
@@ -262,7 +290,6 @@ class SoundManager {
 
 window.soundManager = new SoundManager();
 
-// Ensure BGM starts on any user interaction anywhere
 ['click', 'pointerdown', 'mousedown', 'keydown'].forEach(evt => {
   window.addEventListener(evt, () => {
     if (window.soundManager && (!window.soundManager.isPlaying && !window.soundManager.isMuted)) {

@@ -402,6 +402,7 @@ class Player {
     const platforms = stage.platforms;
     for (let i = 0; i < platforms.length; i++) {
       const plat = platforms[i];
+      if (plat.userData.collapsed) continue;
       const b = plat.userData.bounds;
       if (!b) continue;
       const pos = plat.position;
@@ -423,7 +424,11 @@ class Player {
           this.groundPlatform = plat;
           newFriction = plat.userData.friction !== undefined ? plat.userData.friction : 0.88;
 
-          // Snowflake Super Jump Pad Launch!
+          if (plat.userData.type === GimmickType.COLLAPSING_ICE) {
+            plat.userData.triggered = true;
+          }
+
+          // Snowflake Super Jump Pad / Santa Drum Trampoline Launch!
           if (plat.userData.type === GimmickType.SNOWFLAKE_PAD && plat.userData.bounceVelocity) {
             const bv = plat.userData.bounceVelocity;
             this.velocity.set(bv.x, bv.y, bv.z);

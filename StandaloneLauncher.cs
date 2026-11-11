@@ -16,7 +16,7 @@ namespace ChristmasAthletic3D
             try
             {
                 // App runtime directory in Local Temp
-                string tempDir = Path.Combine(Path.GetTempPath(), "ChristmasAthletic3D_v500");
+                string tempDir = Path.Combine(Path.GetTempPath(), "ChristmasAthletic3D_v600");
                 string indexPath = Path.Combine(tempDir, "index.html");
 
                 // If not extracted yet, extract embedded game package
